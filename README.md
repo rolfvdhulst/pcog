@@ -1,0 +1,1 @@
+This repository contains code for solving the graph coloring (also known as vertex coloring) problem exactly in an efficient manner. 
