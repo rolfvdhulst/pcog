@@ -12,7 +12,8 @@
       "binaryDir": "${sourceDir}/build",
       "hidden": true,
       "cacheVariables": {
-        "PCOG_BUILD_TESTS": "ON"
+        "PCOG_BUILD_TESTS": "ON",
+        "PCOG_BUILD_DOCS": "ON"
       }
     },
     {
