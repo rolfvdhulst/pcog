@@ -13,7 +13,8 @@
       "hidden": true,
       "cacheVariables": {
         "PCOG_BUILD_TESTS": "ON",
-        "PCOG_BUILD_DOCS": "ON"
+        "PCOG_BUILD_DOCS": "ON",
+        "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {

@@ -28,7 +28,7 @@ find_package(GTest REQUIRED)
 
 set(test_sources
         test_main.cpp
-        pcog_test.cpp
+        LPSolverTest.cpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${test_sources})
 
@@ -43,6 +43,8 @@ target_link_libraries(pcog-tests
         PRIVATE
         pcog::pcog
         GTest::GTest)
+set_target_properties(pcog-tests PROPERTIES
+        CXX_STANDARD 20)
 
 if(NOT is_top_level)
     win_copy_deps_to_target_dir(pcog-tests pcog::pcog)

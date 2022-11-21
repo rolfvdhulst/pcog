@@ -33,6 +33,7 @@ add_library(pcog::pcog ALIAS pcog)
 #Dependencies:
 
 
+find_package(SoPlex REQUIRED)
 #Setup target
 
 include(GenerateExportHeader)
@@ -47,6 +48,8 @@ set(sources
         include/pcog/export.h
         include/pcog/pcog.hpp
         src/pcog.cpp
+        include/pcog/LPSolver.hpp
+        src/LPSolver.cpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
@@ -56,14 +59,21 @@ include(CMakePackageConfigHelpers)
 target_sources(pcog PRIVATE ${sources})
 target_compile_definitions(pcog PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PCOG_STATIC_DEFINE>")
 
+target_link_libraries(pcog
+        PUBLIC ${SOPLEX_LIBRARIES}
+        )
 target_include_directories(pcog
         PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>")
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+        ${SOPLEX_INCLUDE_DIRS}
+        )
 
 set_target_properties(pcog PROPERTIES
         SOVERSION ${PROJECT_VERSION_MAJOR}
-        VERSION ${PROJECT_VERSION})
+        VERSION ${PROJECT_VERSION}
+        CXX_STANDARD 20
+        )
 
 if(PCOG_INSTALL AND NOT CMAKE_SKIP_INSTALL_RULES)
 
