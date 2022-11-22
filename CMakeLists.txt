@@ -50,6 +50,9 @@ set(sources
         src/pcog.cpp
         include/pcog/LPSolver.hpp
         src/LPSolver.cpp
+        src/DenseSet.cpp
+        include/pcog/DenseSet.hpp
+        include/pcog/Definitions.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

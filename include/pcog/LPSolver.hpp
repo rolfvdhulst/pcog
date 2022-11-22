@@ -55,8 +55,16 @@ class LPSolver {
    bool solve();
 
    //Following functions are unfortunately not const because of SoPlex
+   /// Gets the dual solution vector of the solved LP
+   /// \return
    RowVector getDualSolution();
+
+   ///
+   /// \return The primal solution of the solved LP
    ColVector getPrimalSolution();
+
+   /// Returns the current LP objective
+   /// \return Returns the current LP objective
    double objective();
  private:
    soplex::SoPlex m_soplex;
