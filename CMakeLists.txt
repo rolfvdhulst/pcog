@@ -11,6 +11,7 @@ string(COMPARE EQUAL "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" is_top_
 option(PCOG_BUILD_TESTS "Turn on to compile the tests" OFF)
 option(PCOG_INSTALL "Generate target for installing the library" OFF)
 option(PCOG_BUILD_DOCS "Build documentation" OFF)
+option(PCOG_COVERAGE "Generate targets for tracking coverage" OFF)
 
 set_if_undefined(PCOG_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/mylib" CACHE STRING
         "Install path for pcog package-related CMake files")
