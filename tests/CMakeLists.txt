@@ -30,6 +30,7 @@ set(test_sources
         test_main.cpp
         LPSolverTest.cpp
         DenseSetTest.cpp
+        NodeMapTest.cpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${test_sources})
 

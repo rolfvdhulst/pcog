@@ -3,7 +3,8 @@ project(pcog VERSION 0.1
         DESCRIPTION "Exact solution methods for difficult combinatorial optimization problems in graphs"
         LANGUAGES CXX)
 
-include(cmake/utils.cmake)
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+include(utils)
 #Check if we are included as a subdirectory of another cmake
 string(COMPARE EQUAL "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" is_top_level)
 
@@ -32,7 +33,23 @@ add_library(pcog) #initialized below
 add_library(pcog::pcog ALIAS pcog)
 
 #Dependencies:
+# enable coverage support
+if(PCOG_COVERAGE)
+    include(CodeCoverage)
 
+    #Workaround with clang...
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        set(GCOVR_ADDITIONAL_ARGS --gcov-executable "llvm-cov gcov")
+    endif()
+
+    append_coverage_compiler_flags()
+
+    setup_target_for_coverage_gcovr_html(
+            NAME       pcog-coverage
+            EXECUTABLE pcog-tests
+            DEPENDENCIES pcog pcog-tests
+    )
+endif()
 
 find_package(SoPlex REQUIRED)
 #Setup target
@@ -54,6 +71,8 @@ set(sources
         src/DenseSet.cpp
         include/pcog/DenseSet.hpp
         include/pcog/Definitions.hpp
+        src/NodeMap.cpp
+        include/pcog/NodeMap.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
@@ -148,3 +167,4 @@ if(PCOG_BUILD_DOCS)
     find_package(Doxygen REQUIRED)
     doxygen_add_docs(docs include)
 endif()
+

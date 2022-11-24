@@ -12,5 +12,6 @@ _deps
 cmake-build-debug
 cmake-build-release
 build
+cov-build
 bin
 .idea
