@@ -8,6 +8,7 @@
 #include "DenseSet.hpp"
 #include "NodeMap.hpp"
 
+namespace pcog {
 /// Models an undirected graph. Loops are allowed, but discouraged.
 /// Optimized for dense graphs, in particular graphs with more than 1% edge
 /// density
@@ -101,9 +102,9 @@ class DenseGraph {
    /// present.
    /// \return True if the data structures are in a valid state
    [[nodiscard]] bool isConsistent() const;
+
  private:
    std::vector<DenseSet> m_adjacencyMatrix;
-
 };
-
+} // namespace pcog
 #endif // PCOG_SRC_DENSEGRAPH_HPP

@@ -7,6 +7,8 @@
 
 #include "Definitions.hpp"
 #include <vector>
+namespace pcog {
+
 class DenseSet;
 
 /// A class which stores a function which maps nodes to other nodes in a dense
@@ -32,12 +34,12 @@ class NodeMap {
    ///  this.
    void transform(const DenseSet &set, DenseSet &toStoreIn) const;
 
-   ///Query/modify the function for a single node
-   /// \param node
-   /// \return A reference to the queried output.
+   /// Query/modify the function for a single node
+   ///  \param node
+   ///  \return A reference to the queried output.
    Node &operator[](Node node);
    const Node &operator[](Node node) const;
-   ///Resets this function to an identity function
+   /// Resets this function to an identity function
    void setIdentity();
    /// \return True if this function is an identity function
    [[nodiscard]] bool isIdentity() const;
@@ -45,5 +47,6 @@ class NodeMap {
    /// \param node To append to the map
    void extend(Node node);
 };
+} // namespace pcog
 
 #endif // PCOG_SRC_NODEMAP_HPP

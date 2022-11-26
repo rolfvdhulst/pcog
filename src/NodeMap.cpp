@@ -5,22 +5,19 @@
 #include "pcog/NodeMap.hpp"
 #include "pcog/DenseSet.hpp"
 
-#include <numeric>
 #include <cassert>
-
-NodeMap::NodeMap(degree_type size) : permutation_map(size,INVALID_NODE){
-
-}
+#include <numeric>
+namespace pcog {
+NodeMap::NodeMap(degree_type size) : permutation_map(size, INVALID_NODE) {}
 
 void NodeMap::setIdentity() {
-   std::iota(permutation_map.begin(),permutation_map.end(),0);
-
+   std::iota(permutation_map.begin(), permutation_map.end(), 0);
 }
 
 bool NodeMap::isIdentity() const {
    Node val = 0;
-   for(const auto& node : permutation_map){
-      if(node != val){
+   for (const auto &node : permutation_map) {
+      if (node != val) {
          return false;
       }
       val++;
@@ -28,14 +25,12 @@ bool NodeMap::isIdentity() const {
    return true;
 }
 
-Node& NodeMap::operator[](Node node) {
-   return permutation_map[node];
-}
+Node &NodeMap::operator[](Node node) { return permutation_map[node]; }
 
 NodeMap NodeMap::inverse(const NodeMap &map, degree_type size) {
    NodeMap inverse;
-   inverse.permutation_map = std::vector(size,INVALID_NODE);
-   for(std::size_t i = 0; i < map.permutation_map.size(); i++){
+   inverse.permutation_map = std::vector(size, INVALID_NODE);
+   for (std::size_t i = 0; i < map.permutation_map.size(); i++) {
       Node value = map.permutation_map[i];
       assert(value < size);
       inverse.permutation_map[value] = i;
@@ -48,19 +43,15 @@ const Node &NodeMap::operator[](Node node) const {
 }
 
 void NodeMap::transform(const DenseSet &set, DenseSet &toStoreIn) const {
-   for(const auto& elem : set){
-      if(permutation_map[elem] != INVALID_NODE){
+   for (const auto &elem : set) {
+      if (permutation_map[elem] != INVALID_NODE) {
          assert(permutation_map[elem] < toStoreIn.capacity());
          toStoreIn.add(permutation_map[elem]);
       }
    }
-
 }
 
-std::size_t NodeMap::size() const {
-   return permutation_map.size();
-}
+std::size_t NodeMap::size() const { return permutation_map.size(); }
 
-void NodeMap::extend(Node node) {
-   permutation_map.push_back(node);
-}
+void NodeMap::extend(Node node) { permutation_map.push_back(node); }
+} // namespace pcog

@@ -5,7 +5,7 @@
 #include <pcog/NodeMap.hpp>
 #include <pcog/DenseSet.hpp>
 #include "gtest/gtest.h"
-
+using namespace pcog;
 
 TEST(NodeMap, construction){
    NodeMap map;

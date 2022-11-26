@@ -13,6 +13,7 @@
 #include <string>
 #include <utility>
 
+namespace pcog {
 class DimacsFileHeader {
  public:
    DimacsFileHeader(std::size_t t_vertices, std::size_t t_edges_expected,
@@ -21,6 +22,8 @@ class DimacsFileHeader {
        : vertices{t_vertices}, edges_expected{t_edges_expected},
          start_edges_pos{t_start_edges_pos}, header{std::move(t_header)},
          file{t_file} {};
+   std::size_t numVertices() const;
+   std::size_t numExpectedEdges() const;
    /// Reads the graph as a dense graph.
    /// \return The dense graph, or std::nullopt if reading somehow failed.
    std::optional<DenseGraph> ReadAsDense();
@@ -50,5 +53,6 @@ bool writeToDimacsFile(const DenseGraph &graph, std::ofstream &file,
 /// \param graph The graph to write out
 /// \param stream The stream to write the dot file to
 /// \return True if succesfull
-bool graphToDot(const DenseGraph& graph, std::ostream& stream);
+bool graphToDot(const DenseGraph &graph, std::ostream &stream);
+} // namespace pcog
 #endif // PCOG_TESTS_GRAPHIO_HPP

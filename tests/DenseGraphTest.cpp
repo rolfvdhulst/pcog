@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <pcog/DenseGraph.hpp>
-
+using namespace pcog;
 TEST(DenseGraph,constructor){
    DenseGraph defCons;
    EXPECT_TRUE(defCons.isConsistent());

@@ -4,7 +4,7 @@
 
 #include <pcog/DenseSet.hpp>
 #include "gtest/gtest.h"
-
+using namespace pcog;
 TEST(DenseSet, construction1){
    DenseSet set;
    EXPECT_EQ(set.capacity(),0);

@@ -3,7 +3,7 @@
 //
 
 #include "pcog/GraphIO.hpp"
-
+namespace pcog {
 std::optional<DimacsFileHeader> readDimacsHeader(std::ifstream &file) {
    if (!file.good()) {
       return std::nullopt;
@@ -30,12 +30,13 @@ std::optional<DimacsFileHeader> readDimacsHeader(std::ifstream &file) {
          try {
             std::size_t vertices = std::stoul(first_substring);
             std::size_t edges_expected = std::stoul(second_substring);
+            long start_edges_pos = file.tellg();
+            return DimacsFileHeader(vertices, edges_expected, start_edges_pos,
+                                    header, file);
          } catch (std::invalid_argument &error) {
             return std::nullopt;
          }
-         long start_edges_pos = file.tellg();
 
-         return DimacsFileHeader(, file, )
       } else {
          header += line;
       }
@@ -82,6 +83,7 @@ bool writeToDimacsFile(const DenseGraph &graph, std::ofstream &ofstream,
 }
 std::optional<DenseGraph> DimacsFileHeader::ReadAsDense() {
    DenseGraph graph(vertices);
+   file.seekg(start_edges_pos);
    std::string line;
    std::string line_prefix = "e ";
    while (std::getline(file, line)) {
@@ -100,19 +102,22 @@ std::optional<DenseGraph> DimacsFileHeader::ReadAsDense() {
    }
    return graph;
 }
-bool graphToDot(const DenseGraph& graph,std::ostream& stream){
+std::size_t DimacsFileHeader::numVertices() const { return vertices; }
+std::size_t DimacsFileHeader::numExpectedEdges() const { return edges_expected; }
+bool graphToDot(const DenseGraph &graph, std::ostream &stream) {
    assert(graph.isConsistent());
    std::size_t n = graph.numNodes();
    stream << "graph g{\n";
 
-   for(std::size_t i = 0; i < n; ++i){
-      for(std::size_t j = i; j < n; ++j){
-         if(graph.isEdge(i,j)){
-            stream <<i <<" -- "<< j <<";\n";
+   for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i; j < n; ++j) {
+         if (graph.isEdge(i, j)) {
+            stream << i << " -- " << j << ";\n";
          }
       }
    }
-   stream <<"}\n";
+   stream << "}\n";
    stream.flush();
    return stream.good();
 }
+} // namespace pcog

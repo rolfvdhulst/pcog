@@ -7,7 +7,7 @@
 
 #include "Definitions.hpp"
 #include <boost/dynamic_bitset.hpp>
-
+namespace pcog {
 class DenseSet {
  private:
    using BlockType = std::size_t;
@@ -199,5 +199,5 @@ class DenseSet {
    /// \return The end iterator for the set.
    [[nodiscard]] ConstIterator end() const;
 };
-
+} // namespace pcog
 #endif // PCOG_SRC_DENSESET_HPP
