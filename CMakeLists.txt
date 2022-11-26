@@ -75,6 +75,8 @@ set(sources
         include/pcog/NodeMap.hpp
         src/DenseGraph.cpp
         include/pcog/DenseGraph.hpp
+        src/GraphIO.cpp
+        include/pcog/GraphIO.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
