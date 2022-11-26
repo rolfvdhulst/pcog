@@ -73,6 +73,8 @@ set(sources
         include/pcog/Definitions.hpp
         src/NodeMap.cpp
         include/pcog/NodeMap.hpp
+        src/DenseGraph.cpp
+        include/pcog/DenseGraph.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
