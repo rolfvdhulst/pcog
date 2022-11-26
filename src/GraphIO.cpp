@@ -100,3 +100,19 @@ std::optional<DenseGraph> DimacsFileHeader::ReadAsDense() {
    }
    return graph;
 }
+bool graphToDot(const DenseGraph& graph,std::ostream& stream){
+   assert(graph.isConsistent());
+   std::size_t n = graph.numNodes();
+   stream << "graph g{\n";
+
+   for(std::size_t i = 0; i < n; ++i){
+      for(std::size_t j = i; j < n; ++j){
+         if(graph.isEdge(i,j)){
+            stream <<i <<" -- "<< j <<";\n";
+         }
+      }
+   }
+   stream <<"}\n";
+   stream.flush();
+   return stream.good();
+}
