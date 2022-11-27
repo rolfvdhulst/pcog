@@ -46,7 +46,8 @@
       "hidden": false,
       "inherits": ["dev-linux-clang-14"],
       "cacheVariables": {
-        "PCOG_COVERAGE": "ON"
+        "PCOG_COVERAGE": "ON",
+        "CODE_COVERAGE": "ON"
       }
     }
   ]

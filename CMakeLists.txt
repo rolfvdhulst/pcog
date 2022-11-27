@@ -36,19 +36,13 @@ add_library(pcog::pcog ALIAS pcog)
 # enable coverage support
 if(PCOG_COVERAGE)
     include(CodeCoverage)
+    target_code_coverage(pcog)
 
-    #Workaround with clang...
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        set(GCOVR_ADDITIONAL_ARGS --gcov-executable "llvm-cov gcov")
-    endif()
-
-    append_coverage_compiler_flags()
-
-    setup_target_for_coverage_gcovr_html(
-            NAME       pcog-coverage
-            EXECUTABLE pcog-tests
-            DEPENDENCIES pcog pcog-tests
-    )
+#    setup_target_for_coverage_lcov(
+#            NAME       pcog-coverage
+#            EXECUTABLE pcog-tests
+#            DEPENDENCIES pcog pcog-tests
+#    )
 endif()
 
 find_package(SoPlex REQUIRED)
@@ -77,6 +71,8 @@ set(sources
         include/pcog/DenseGraph.hpp
         src/GraphIO.cpp
         include/pcog/GraphIO.hpp
+        src/Coloring.cpp
+        include/pcog/Coloring.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
@@ -171,4 +167,3 @@ if(PCOG_BUILD_DOCS)
     find_package(Doxygen REQUIRED)
     doxygen_add_docs(docs include)
 endif()
-

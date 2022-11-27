@@ -32,6 +32,7 @@ set(test_sources
         DenseSetTest.cpp
         NodeMapTest.cpp
         DenseGraphTest.cpp
+        ColoringTest.cpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${test_sources})
 
@@ -48,7 +49,9 @@ target_link_libraries(pcog-tests
         GTest::GTest)
 set_target_properties(pcog-tests PROPERTIES
         CXX_STANDARD 20)
-
+if(PCOG_COVERAGE)
+    target_code_coverage(pcog-tests)
+endif()
 if(NOT is_top_level)
     win_copy_deps_to_target_dir(pcog-tests pcog::pcog)
 endif()
