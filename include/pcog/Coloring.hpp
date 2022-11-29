@@ -16,7 +16,6 @@ namespace pcog {
 
 class DenseGraph;
 class NodeColoring;
-class PreprocessedMap;
 
 
 using Color = Node;
@@ -61,10 +60,6 @@ class NodeColoring {
    /// \param num_nodes The number of nodes the coloring has
    /// \param coloring The set coloring
    NodeColoring(std::size_t num_nodes, const SetColoring &coloring);
-
-   //TODO: move to preprocessing/postprocessing?
-//   [[nodiscard]] NodeColoring extend(const PreprocessedMap &map,
-//                                     const DenseGraph &originalGraph) const;
 
    /// Accesses the color of the given node. Allows it to be overwritten.
    /// \param node The node to get the color for.

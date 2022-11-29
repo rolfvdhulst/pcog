@@ -37,12 +37,6 @@ add_library(pcog::pcog ALIAS pcog)
 if(PCOG_COVERAGE)
     include(CodeCoverage)
     target_code_coverage(pcog)
-
-#    setup_target_for_coverage_lcov(
-#            NAME       pcog-coverage
-#            EXECUTABLE pcog-tests
-#            DEPENDENCIES pcog pcog-tests
-#    )
 endif()
 
 find_package(SoPlex REQUIRED)
@@ -73,6 +67,8 @@ set(sources
         include/pcog/GraphIO.hpp
         src/Coloring.cpp
         include/pcog/Coloring.hpp
+        src/Preprocessing.cpp
+        include/pcog/Preprocessing.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

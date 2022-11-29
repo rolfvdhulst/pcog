@@ -49,58 +49,7 @@ NodeColoring::NodeColoring(std::size_t num_nodes, const SetColoring &coloring)
 NodeColoring::NodeColoring(std::size_t num_nodes)
     : color(num_nodes, INVALID_COLOR), num_colors{0} {}
 
-// TODO: move to preprocessing
-/*
-NodeColoring NodeColoring::extend(const PreprocessedMap &map,
-                                  const DenseGraph &originalGraph) const {
-   NodeColoring newColoring(map.oldToNewIDs.size());
-   newColoring.num_colors = num_colors;
-   for (std::size_t node = 0; node < color.size(); ++node) {
-      newColoring.color[map.newToOldIDs[node]] = color[node];
-   }
-   if (!map.removed_nodes.empty()) {
-      DenseSet unused_colors(num_colors);
-      for (auto it = map.removed_nodes.rbegin(); it != map.removed_nodes.rend();
-           it++) {
-         const PreprocessedNode &preprocessedNode = *it;
-         if (preprocessedNode.removedReason() ==
-             PreprocessedReason::LOW_DEGREE) {
-            assert(newColoring.color[preprocessedNode.removedNode()] >=
-                   num_colors);
-            unused_colors.setAll();
-            Node removed_node = preprocessedNode.removedNode();
-            for (const auto &node : originalGraph.neighbourhood(removed_node)) {
-               if (newColoring.color[node] <
-                   num_colors) { // the removed node may have some other removed
-                                 // nodes in its neighbourhood which were
-                                 // removed earlier
-                  unused_colors.remove(newColoring.color[node]);
-               }
-            }
-            std::size_t assigned_color = unused_colors.first();
-            newColoring.color[removed_node] = assigned_color;
-            assert(newColoring.color[preprocessedNode.removedNode()] <
-                   num_colors);
-         } else if (preprocessedNode.removedReason() ==
-                    PreprocessedReason::DOMINATED_NODE) {
-            // in case the node was dominated, we can extend it by using the
-            // same color
-            assert(newColoring.color[preprocessedNode.removedNode()] >=
-                   num_colors);
-            assert(newColoring.color[preprocessedNode.dominatingNode()] <
-                   num_colors);
-            newColoring.color[preprocessedNode.removedNode()] =
-                newColoring.color[preprocessedNode.dominatingNode()];
-            assert(newColoring.color[preprocessedNode.removedNode()] <
-                   num_colors);
-         }
-      }
-   }
 
-   assert(hasNoInvalidNodes());
-   return newColoring;
-}
-*/
 
 bool NodeColoring::hasNoInvalidNodes() const {
    return std::all_of(color.begin(), color.end(),
