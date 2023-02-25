@@ -158,4 +158,7 @@ Node DenseGraph::addNodeWithNeighbourhood(DenseSet t_neighbourhood) {
 degree_type DenseGraph::nodeDegree(Node t_node) const {
    return neighbourhood(t_node).size(); // TODO: cache size values?
 }
+void DenseGraph::clear() {
+   m_adjacencyMatrix.clear();
+}
 } // namespace pcog

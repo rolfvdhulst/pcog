@@ -22,8 +22,8 @@ class DimacsFileHeader {
        : vertices{t_vertices}, edges_expected{t_edges_expected},
          start_edges_pos{t_start_edges_pos}, header{std::move(t_header)},
          file{t_file} {};
-   std::size_t numVertices() const;
-   std::size_t numExpectedEdges() const;
+   [[nodiscard]] std::size_t numVertices() const;
+   [[nodiscard]] std::size_t numExpectedEdges() const;
    /// Reads the graph as a dense graph.
    /// \return The dense graph, or std::nullopt if reading somehow failed.
    std::optional<DenseGraph> ReadAsDense();

@@ -29,14 +29,15 @@ endif()
 set_if_undefined(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set_if_undefined(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
-add_library(pcog) #initialized below
-add_library(pcog::pcog ALIAS pcog)
+add_library(libpcog) #initialized below
+add_library(pcog::pcog ALIAS libpcog)
+set_target_properties(libpcog PROPERTIES OUTPUT_NAME "pcog")
 
 #Dependencies:
 # enable coverage support
 if(PCOG_COVERAGE)
     include(CodeCoverage)
-    target_code_coverage(pcog)
+    target_code_coverage(libpcog)
 endif()
 
 find_package(SoPlex REQUIRED)
@@ -48,7 +49,7 @@ set(export_file_name "export_shared.h")
 if(NOT BUILD_SHARED_LIBS)
     set(export_file_name "export_static.h")
 endif()
-generate_export_header(pcog EXPORT_FILE_NAME include/pcog/${export_file_name})
+generate_export_header(libpcog EXPORT_FILE_NAME include/pcog/${export_file_name})
 
 set(sources
         include/pcog/export.h
@@ -69,24 +70,45 @@ set(sources
         include/pcog/Coloring.hpp
         src/Preprocessing.cpp
         include/pcog/Preprocessing.hpp
+        src/Branching.cpp
+        include/pcog/Branching.hpp
+        src/BBNode.cpp
+        include/pcog/BBNode.hpp
+        src/ColorSolver.cpp
+        include/pcog/ColorSolver.hpp
+        src/ColorNodeWorker.cpp
+        include/pcog/ColorNodeWorker.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
 
 include(CMakePackageConfigHelpers)
 
-target_sources(pcog PRIVATE ${sources})
-target_compile_definitions(pcog PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PCOG_STATIC_DEFINE>")
+target_sources(libpcog PRIVATE ${sources})
+target_compile_definitions(libpcog PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PCOG_STATIC_DEFINE>")
 
-target_link_libraries(pcog
+target_link_libraries(libpcog
         PUBLIC ${SOPLEX_LIBRARIES}
         )
-target_include_directories(pcog
+target_include_directories(libpcog
         PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
         ${SOPLEX_INCLUDE_DIRS}
         )
+
+set_target_properties(libpcog PROPERTIES
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+        VERSION ${PROJECT_VERSION}
+        CXX_STANDARD 20
+        )
+
+#TODO fix executable target installation etc.
+add_executable(pcog
+        src/main.cpp)
+
+target_link_libraries(pcog
+        PUBLIC pcog::pcog)
 
 set_target_properties(pcog PROPERTIES
         SOVERSION ${PROJECT_VERSION_MAJOR}
@@ -102,7 +124,7 @@ if(PCOG_INSTALL AND NOT CMAKE_SKIP_INSTALL_RULES)
     write_basic_package_version_file(pcog-config-version.cmake
             COMPATIBILITY SameMajorVersion)
 
-    install(TARGETS pcog EXPORT pcog_export
+    install(TARGETS libpcog EXPORT pcog_export
             RUNTIME COMPONENT pcog
             LIBRARY COMPONENT pcog NAMELINK_COMPONENT pcog-dev
             ARCHIVE COMPONENT pcog-dev

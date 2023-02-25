@@ -33,8 +33,12 @@ class DenseGraph {
    /// \param a First edge node
    /// \param b Second edge node
    void removeEdge(Node a, Node b);
-   /// Removes all edges and makes the graph an empty graph
+   /// Removes all edges, but keeps the vertices
    void clearEdges();
+
+   /// Removes all edges and vertices, making the graph empty
+   void clear();
+
    /// Complements the graph, removing all edges which were present and adding
    /// all edges which were not. Does not add any self loops
    void complement();

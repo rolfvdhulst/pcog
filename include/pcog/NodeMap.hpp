@@ -34,6 +34,9 @@ class NodeMap {
    ///  this.
    void transform(const DenseSet &set, DenseSet &toStoreIn) const;
 
+   ///Empties the node-map
+   void clear();
+
    /// Query/modify the function for a single node
    ///  \param node
    ///  \return A reference to the queried output.

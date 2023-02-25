@@ -54,4 +54,7 @@ void NodeMap::transform(const DenseSet &set, DenseSet &toStoreIn) const {
 std::size_t NodeMap::size() const { return permutation_map.size(); }
 
 void NodeMap::extend(Node node) { permutation_map.push_back(node); }
+void NodeMap::clear() {
+   permutation_map.clear();
+}
 } // namespace pcog

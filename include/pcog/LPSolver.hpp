@@ -6,6 +6,7 @@
 #define PCOG_SRC_LPSOLVER_HPP
 
 #include "soplex.h"
+#include "soplex/spxbasis.h"
 #include <optional>
 
 namespace pcog {
@@ -29,6 +30,12 @@ using RowVector = std::vector<RowElem>;
 using ColVector = std::vector<ColElem>;
 
 enum class ObjectiveSense { MINIMIZE, MAXIMIZE };
+
+//TODO: how to store basis efficiently, and in particular how to change it when columns or rows are added in order to hot start?
+
+class LPBasis{
+   friend class LPSolver;
+};
 /// \brief class which holds the LP solver
 class LPSolver {
  public:
@@ -66,6 +73,7 @@ class LPSolver {
    /// Returns the current LP objective
    /// \return Returns the current LP objective
    double objective();
+   //TODO: functions for setting/getting the basis
  private:
    soplex::SoPlex m_soplex;
 };

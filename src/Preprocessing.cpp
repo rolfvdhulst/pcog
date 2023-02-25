@@ -5,7 +5,7 @@
 #include "pcog/Preprocessing.hpp"
 #include <utility>
 
-using namespace pcog;
+namespace pcog {
 PreprocessingResult::PreprocessingResult(DenseGraph graph, PreprocessedMap map)
     : graph{std::move(graph)}, map{std::move(map)} {}
 
@@ -43,8 +43,7 @@ PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph,
    auto [newGraph, newToOld] = graph.nodeInducedSubgraph(present_nodes);
    NodeMap oldToNew = NodeMap::inverse(newToOld, graph.numNodes());
 
-   return PreprocessingResult(
-       newGraph, PreprocessedMap(removed_nodes, newToOld, oldToNew));
+   return {newGraph, PreprocessedMap(removed_nodes, newToOld, oldToNew)};
 }
 
 std::vector<PreprocessedNode>
@@ -114,6 +113,12 @@ PreprocessedMap::PreprocessedMap(std::vector<PreprocessedNode> removed_nodes,
     : removed_nodes{std::move(removed_nodes)}, newToOldIDs{std::move(newToOld)},
       oldToNewIDs{std::move(oldToNew)} {}
 
+void PreprocessedMap::clear() {
+   removed_nodes.clear();
+   newToOldIDs.clear();
+   oldToNewIDs.clear();
+}
+
 std::vector<PreprocessedNode> removeLowDegreeVertices(const DenseGraph &graph,
                                                       DenseSet &present_nodes,
                                                       std::size_t lower_bound) {
@@ -132,8 +137,7 @@ std::vector<PreprocessedNode> removeLowDegreeVertices(const DenseGraph &graph,
    present_nodes.inplaceDifference(removed_nodes);
    std::vector<PreprocessedNode> removed;
    for (const auto &node : removed_nodes) {
-      removed.emplace_back(
-          PreprocessedNode(node, PreprocessedReason::LOW_DEGREE));
+      removed.emplace_back(node, PreprocessedReason::LOW_DEGREE);
    }
    return removed;
 }
@@ -165,9 +169,9 @@ removeStrictlyDominatedVertices(const DenseGraph &graph,
    return removed_nodes;
 }
 
-NodeColoring extendColoring(const NodeColoring& coloring,
+NodeColoring extendColoring(const NodeColoring &coloring,
                             const PreprocessedMap &map,
-                            const DenseGraph &originalGraph){
+                            const DenseGraph &originalGraph) {
    NodeColoring newColoring(map.oldToNewIDs.size());
    newColoring.setNumColors(coloring.numColors());
 
@@ -179,14 +183,18 @@ NodeColoring extendColoring(const NodeColoring& coloring,
       for (auto it = map.removed_nodes.rbegin(); it != map.removed_nodes.rend();
            it++) {
          const PreprocessedNode &preprocessedNode = *it;
-         if (preprocessedNode.removedReason() == PreprocessedReason::LOW_DEGREE) {
-            assert(newColoring[preprocessedNode.removedNode()] >= coloring.numColors());
+         if (preprocessedNode.removedReason() ==
+             PreprocessedReason::LOW_DEGREE) {
+            assert(newColoring[preprocessedNode.removedNode()] >=
+                   coloring.numColors());
             unused_colors.setAll();
             Node removed_node = preprocessedNode.removedNode();
             for (const auto &node : originalGraph.neighbourhood(removed_node)) {
-               if (newColoring[node] < coloring.numColors()) { // the removed node may have some other removed
-                                 // nodes in its neighbourhood which were
-                                 // removed earlier
+               if (newColoring[node] <
+                   coloring.numColors()) { // the removed node may have some
+                                           // other removed
+                  // nodes in its neighbourhood which were
+                  // removed earlier
                   unused_colors.remove(newColoring[node]);
                }
             }
@@ -213,3 +221,4 @@ NodeColoring extendColoring(const NodeColoring& coloring,
    assert(newColoring.hasNoInvalidNodes());
    return newColoring;
 }
+} // namespace pcog
