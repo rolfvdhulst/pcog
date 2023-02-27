@@ -3,17 +3,43 @@
 //
 
 #include "pcog/Preprocessing.hpp"
+#include "pcog/mwss/CombinatorialStableSet.hpp"
 #include <utility>
 
 namespace pcog {
 PreprocessingResult::PreprocessingResult(DenseGraph graph, PreprocessedMap map)
     : graph{std::move(graph)}, map{std::move(map)} {}
 
-PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph,
-                                            const DenseSet &clique) {
+DenseSet findInitialClique(const DenseGraph& t_graph){
+   DenseSet data;
 
+   auto mss_callback = [](const DenseSet& current_nodes, MaxStableSetCombinatorial::weight_type total_weight, void * user_data, bool first_solution, bool& stop_solving, bool& accepted_solution){
+      auto * data = static_cast<DenseSet *>(user_data);
+      *data = current_nodes;
+      accepted_solution = true;
+      stop_solving = false;
+   };
+   DenseGraph complementGraph = t_graph;
+   complementGraph.complement();
+
+   MaxStableSetCombinatorial mss(UniformWeightFunction(),complementGraph);
+   mss.setUserData(&data);
+   mss.setCallback(mss_callback);
+   mss.setInfiniteUpperBound();
+   mss.setNodeLimit(50'000);
+
+   mss.run();
+
+   std::cout<<mss.numBranchAndBoundNodes()<<" b&b nodes for finding clique  ns/node: "<<double(mss.timeTaken().count()) / mss.numBranchAndBoundNodes() <<std::endl;
+   std::cout<<"total time: "<<double(mss.timeTaken().count())/1e9<<" seconds"<<std::endl;
+   std::cout<<"found clique size: "<<data.size()<<std::endl;
+
+   return data;
+}
+PreprocessingResult preprocessOriginalGraph(const DenseGraph &t_graph) {
+   DenseSet clique = findInitialClique(t_graph);
    std::vector<PreprocessedNode> removed_nodes;
-   DenseSet present_nodes(graph.numNodes(), true);
+   DenseSet present_nodes(t_graph.numNodes(), true);
    assert(present_nodes.full());
 
    std::size_t previous_round_size = 1;
@@ -21,7 +47,7 @@ PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph,
       previous_round_size = removed_nodes.size();
       while (true) {
          auto low_degree_removed =
-             removeLowDegreeVerticesClique(graph, present_nodes, clique);
+             removeLowDegreeVerticesClique(t_graph, present_nodes, clique);
          if (low_degree_removed.empty()) {
             break;
          }
@@ -31,7 +57,7 @@ PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph,
 
       while (true) {
          auto dominated_removed =
-             removeDominatedVerticesClique(graph, present_nodes, clique);
+             removeDominatedVerticesClique(t_graph, present_nodes, clique);
          if (dominated_removed.empty()) {
             break;
          }
@@ -40,8 +66,8 @@ PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph,
       }
    }
 
-   auto [newGraph, newToOld] = graph.nodeInducedSubgraph(present_nodes);
-   NodeMap oldToNew = NodeMap::inverse(newToOld, graph.numNodes());
+   auto [newGraph, newToOld] = t_graph.nodeInducedSubgraph(present_nodes);
+   NodeMap oldToNew = NodeMap::inverse(newToOld, t_graph.numNodes());
 
    return {newGraph, PreprocessedMap(removed_nodes, newToOld, oldToNew)};
 }

@@ -57,12 +57,10 @@ struct PreprocessingResult {
    PreprocessedMap map;
 };
 
-/// Preprocess a graph given a clique.
+/// Preprocess the original root node graph
 /// \param graph The graph to preprocess
-/// \param clique A set of nodes which forms a clique in the graph
 /// \return The preprocessing result with graph and map.
-PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph,
-                                            const DenseSet &clique);
+PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph);
 
 /// Preprocess low degree vertices from the graph, given a clique which is not
 /// to be removed. This function modifies the present nodes, and only considers

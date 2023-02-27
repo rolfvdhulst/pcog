@@ -29,7 +29,7 @@ endif()
 set_if_undefined(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set_if_undefined(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
-add_library(libpcog) #initialized below
+add_library(libpcog ) #initialized below
 add_library(pcog::pcog ALIAS libpcog)
 set_target_properties(libpcog PROPERTIES OUTPUT_NAME "pcog")
 
@@ -78,6 +78,10 @@ set(sources
         include/pcog/ColorSolver.hpp
         src/ColorNodeWorker.cpp
         include/pcog/ColorNodeWorker.hpp
+        include/pcog/mwss/WeightFunction.hpp
+        include/pcog/mwss/CombinatorialStableSet.hpp
+        src/SparseSet.cpp
+        include/pcog/SparseSet.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

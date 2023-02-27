@@ -25,9 +25,8 @@ SolverStatus ColorSolver::solve() {
    //First presolve the problem
    {
       setStatus(SolverStatus::PRESOLVING);
-      DenseSet clique; //TODO: find clique
       {
-         auto result = preprocessOriginalGraph(m_originalGraph,clique);
+         auto result = preprocessOriginalGraph(m_originalGraph);
          m_preprocessedGraph = result.graph;
          m_preprocessedToOriginal = result.map;
       }
