@@ -6,6 +6,7 @@
 #define PCOG_SRC_BBNODE_HPP
 #include "Branching.hpp"
 #include <queue>
+#include <utility>
 
 namespace pcog {
 enum class BBNodeStatus {
@@ -16,16 +17,23 @@ enum class BBNodeStatus {
              // bound
 };
 
-using node_id = std::size_t; //TODO: rename to something not confusable with graph nodes
+using node_id =
+    std::size_t; // TODO: rename to something not confusable with graph nodes
 static constexpr node_id INVALID_BB_NODE = std::numeric_limits<node_id>::max();
+
 class BBNode {
  public:
-   BBNode(node_id id, node_id parent_id, node_id depth, double lowerBound,
-          BranchData branchInfo)
+   BBNode(node_id id, node_id parent_id, node_id depth,
+          double fractionalLowerBound, std::size_t lowerBound,
+          std::vector<BranchData> branchInfo)
        : m_id{id}, m_parent_id{parent_id}, m_depth{depth},
-         m_branchData{branchInfo}, m_status{BBNodeStatus::INITIALIZED}, m_lowerBound{lowerBound} {};
+         m_branchingDecisions{std::move(branchInfo)}, m_status{BBNodeStatus::INITIALIZED},
+         m_fractionalLowerBound{fractionalLowerBound}, m_lowerBound{lowerBound},
+         m_firstBranchNode{INVALID_NODE},m_secondBranchNode{INVALID_NODE}
+         {};
    [[nodiscard]] node_id id() const { return m_id; }
-   [[nodiscard]] double lowerBound() const { return m_lowerBound; }
+   [[nodiscard]] double fractionalLowerBound() const { return m_fractionalLowerBound; }
+   [[nodiscard]] std::size_t lowerBound() const {return m_lowerBound;}
    [[nodiscard]] node_id parent() const { return m_parent_id; }
    [[nodiscard]] const std::vector<node_id> &children() const {
       return m_childrenID;
@@ -33,16 +41,19 @@ class BBNode {
    [[nodiscard]] std::size_t depth() const { return m_depth; }
    [[nodiscard]] BBNodeStatus status() const { return m_status; }
 
-   [[nodiscard]] Node firstBranchingNode() const { return m_firstBranchNode;}
-   [[nodiscard]] Node secondBranchNode() const {return m_secondBranchNode;}
+   [[nodiscard]] const std::vector<BranchData> branchDecisions() const {return m_branchingDecisions;}
+   [[nodiscard]] Node firstBranchingNode() const { return m_firstBranchNode; }
+   [[nodiscard]] Node secondBranchNode() const { return m_secondBranchNode; }
+
  private:
    node_id m_id;
    node_id m_parent_id;
    std::vector<node_id> m_childrenID;
    std::size_t m_depth;
-   BranchData m_branchData;
+   std::vector<BranchData> m_branchingDecisions;
    BBNodeStatus m_status;
-   double m_lowerBound;
+   double m_fractionalLowerBound;
+   std::size_t m_lowerBound;
    Node m_firstBranchNode;
    Node m_secondBranchNode;
    // TODO: store basis and other information
@@ -57,9 +68,10 @@ class BBTree {
 
    [[nodiscard]] bool hasOpenNodes() const;
 
-   BBNode& popNextNode();
+   BBNode &popNextNode();
 
    void createChildren(node_id t_node);
+
  private:
    // TODO: for now we store the entire b&b tree, but by increasing the
    // per-memory, we can get away with only storing the open nodes Evaluate if

@@ -73,6 +73,8 @@ class LPSolver {
    /// Returns the current LP objective
    /// \return Returns the current LP objective
    double objective();
+
+   void clear();
    //TODO: functions for setting/getting the basis
  private:
    soplex::SoPlex m_soplex;

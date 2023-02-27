@@ -68,5 +68,8 @@ ColVector LPSolver::getPrimalSolution() {
 double LPSolver::objective() {
    return m_soplex.objValueReal();
 }
+void LPSolver::clear() {
+   m_soplex.clearLPReal();
+}
 
 } // namespace pcog

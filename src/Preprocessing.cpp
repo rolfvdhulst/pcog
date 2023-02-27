@@ -148,7 +148,9 @@ void PreprocessedMap::clear() {
 std::vector<PreprocessedNode> removeLowDegreeVertices(const DenseGraph &graph,
                                                       DenseSet &present_nodes,
                                                       std::size_t lower_bound) {
-
+   if(lower_bound == 0){
+      return {};
+   }
    DenseSet removed_nodes(graph.numNodes());
    assert(removed_nodes.empty());
 

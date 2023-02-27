@@ -13,18 +13,14 @@
 namespace pcog {
 
 class StableSetVariable{
+ public:
+   [[nodiscard]] const DenseSet& set() const { return m_set;}
  private:
    DenseSet m_set;
 };
 
-class NodeConstraint{
- public:
-   explicit NodeConstraint(Node t_node) : m_node{t_node}{};
- private:
-   Node m_node;
-};
-
 enum class SolverStatus{
+   NO_PROBLEM,
    PROBLEM_INITIALIZED, /// The solver has read a problem but has not started solving yet
    PRESOLVING, /// The solver is currently preprocessing the problem
    PRESOLVED, /// The solver has read the problem and preprocessed it
@@ -43,23 +39,25 @@ class ColorSolver {
    void setProblem(std::string t_name, DenseGraph t_graph);
 
    SolverStatus solve();
+
+   const DenseGraph& preprocessedGraph() const {return m_preprocessedGraph;}
+   const std::vector<StableSetVariable>& variables() const {return m_variables;}
  private:
    void setStatus(SolverStatus t_status);
-   SolverStatus m_status;
+   SolverStatus m_status = SolverStatus::NO_PROBLEM;
+   ColorNodeWorker m_worker;
 
+   //Shared data, constant
    std::string m_problemName;
    //Original Problem data
    DenseGraph m_originalGraph;
-   //Problem after presolving
+   //Problem after presolving.
    DenseGraph m_preprocessedGraph;
    PreprocessedMap m_preprocessedToOriginal;
 
-   ColorNodeWorker m_worker;
-   //Shared solution data. The variables constraints and colorings are in terms of the preprocessed graph.
+   //Shared solution data, not constant. The variables constraints and colorings are in terms of the preprocessed graph.
    std::vector<StableSetVariable> m_variables;
-   std::vector<NodeConstraint> m_constraints;
    std::vector<std::vector<std::size_t>> m_colorings;
-
    BBTree m_tree;
 
    //TODO: statistics (LP its, nodes,

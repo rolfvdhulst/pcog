@@ -14,7 +14,6 @@ void ColorSolver::setProblem(std::string t_name, DenseGraph t_graph) {
    m_preprocessedGraph.clear();
    m_preprocessedToOriginal.clear();
    m_variables.clear();
-   m_constraints.clear();
    m_colorings.clear();
    m_tree.clear();
 
@@ -30,10 +29,6 @@ SolverStatus ColorSolver::solve() {
          m_preprocessedGraph = result.graph;
          m_preprocessedToOriginal = result.map;
       }
-      //set up the constraints, one for each node.
-      for(Node node = 0; node < m_preprocessedGraph.numNodes(); ++node){
-         m_constraints.emplace_back(node);
-      }
       setStatus(SolverStatus::PRESOLVED);
    }
 
@@ -44,7 +39,8 @@ SolverStatus ColorSolver::solve() {
       //Branch-and-bound loop
       while(m_tree.hasOpenNodes()){
          BBNode& bb_node = m_tree.popNextNode();
-         m_worker.processNode(bb_node);
+
+         m_worker.processNode(bb_node,*this); //TODO: ugly *this usage, use intermediary struct to save data.
          if (bb_node.status() == BBNodeStatus::BRANCHED){
 
             m_tree.createChildren(bb_node.id());
