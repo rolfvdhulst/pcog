@@ -5,6 +5,36 @@
 #include "pcog/LPSolver.hpp"
 using namespace soplex;
 namespace pcog {
+
+LPSolverStatus convertStatus(SPxSolver::Status status){
+   switch (status) {
+   case SPxSolverBase<double>::Status::OPTIMAL:
+      return LPSolverStatus::OPTIMAL;
+   case SPxSolverBase<double>::Status::INFEASIBLE:
+      return LPSolverStatus::INFEASIBLE;
+//   case SPxSolverBase<double>::Status::UNBOUNDED:
+//   case SPxSolverBase<double>::Status::INForUNBD:
+//   case SPxSolverBase<double>::Status::OPTIMAL_UNSCALED_VIOLATIONS:
+//   case SPxSolverBase<double>::Status::ERROR:
+//   case SPxSolverBase<double>::Status::NO_RATIOTESTER:
+//   case SPxSolverBase<double>::Status::NO_PRICER:
+//   case SPxSolverBase<double>::Status::NO_SOLVER:
+//   case SPxSolverBase<double>::Status::NOT_INIT:
+//   case SPxSolverBase<double>::Status::ABORT_EXDECOMP:
+//   case SPxSolverBase<double>::Status::ABORT_DECOMP:
+//   case SPxSolverBase<double>::Status::ABORT_CYCLING:
+//   case SPxSolverBase<double>::Status::ABORT_TIME:
+//   case SPxSolverBase<double>::Status::ABORT_ITER:
+//   case SPxSolverBase<double>::Status::ABORT_VALUE:
+//   case SPxSolverBase<double>::Status::SINGULAR:
+//   case SPxSolverBase<double>::Status::NO_PROBLEM:
+//   case SPxSolverBase<double>::Status::REGULAR:
+//   case SPxSolverBase<double>::Status::RUNNING:
+//   case SPxSolverBase<double>::Status::UNKNOWN:
+   default:
+      return LPSolverStatus::ERROR; //TODO: create more cases
+   }
+}
 void LPSolver::setObjectiveSense(ObjectiveSense t_objective) {
    switch (t_objective) {
    case ObjectiveSense::MINIMIZE:
@@ -45,15 +75,23 @@ bool LPSolver::solve() {
 RowVector LPSolver::getDualSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
    DVector spxVector(m_soplex.numRows()); //TODO: how do we know how much space to allocate?
-   m_soplex.getDual(spxVector);
-
+   bool result = m_soplex.getDual(spxVector); //TODO: error handling
+   assert(result);
    RowVector rowVector; //TODO reserve/allocate space
    for (int i = 0; i < spxVector.dim(); ++i) {
       rowVector.emplace_back(i,spxVector[i]);
    }
    return rowVector;
 }
-
+RowVector LPSolver::columnUpperBounds() {
+   DVector spxVector(m_soplex.numRows()); //TODO: how do we know how much space to allocate?
+   m_soplex.getUpperReal(spxVector); //TODO: error handling
+   RowVector vector; //TODO reserve/allocate space
+   for (int i = 0; i < spxVector.dim(); ++i) {
+      vector.emplace_back(i,spxVector[i]);
+   }
+   return vector;
+}
 ColVector LPSolver::getPrimalSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
    DVector spxVector(m_soplex.numCols()); //TODO: how do we know how much space to allocate?
@@ -71,5 +109,9 @@ double LPSolver::objective() {
 void LPSolver::clear() {
    m_soplex.clearLPReal();
 }
+LPSolverStatus LPSolver::status(){
+return convertStatus(m_soplex.status());
+}
+
 
 } // namespace pcog

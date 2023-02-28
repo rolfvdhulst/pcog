@@ -41,10 +41,20 @@ class BBNode {
    [[nodiscard]] std::size_t depth() const { return m_depth; }
    [[nodiscard]] BBNodeStatus status() const { return m_status; }
 
-   [[nodiscard]] const std::vector<BranchData> branchDecisions() const {return m_branchingDecisions;}
+   [[nodiscard]] std::vector<BranchData> branchDecisions() const {return m_branchingDecisions;}
    [[nodiscard]] Node firstBranchingNode() const { return m_firstBranchNode; }
    [[nodiscard]] Node secondBranchNode() const { return m_secondBranchNode; }
 
+   /// Check if a stable set meets the branching decisions taken for this node. Used only for debugging.
+   [[nodiscard]] bool verifyStableSet(const DenseSet& set) const{
+      for(const auto& data : m_branchingDecisions){
+         if((data.type == BranchType::SAME && (set.contains(data.first) != set.contains(data.second))) ||
+             (data.type == BranchType::DIFFER && set.contains(data.first) && set.contains(data.second))){
+            return false;
+         }
+      }
+      return true;
+   }
  private:
    node_id m_id;
    node_id m_parent_id;

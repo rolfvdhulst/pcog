@@ -82,6 +82,8 @@ set(sources
         include/pcog/mwss/CombinatorialStableSet.hpp
         src/SparseSet.cpp
         include/pcog/SparseSet.hpp
+        src/StableSetMaximizer.cpp
+        include/pcog/StableSetMaximizer.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

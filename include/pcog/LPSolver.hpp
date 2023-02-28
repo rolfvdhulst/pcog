@@ -33,6 +33,7 @@ enum class ObjectiveSense { MINIMIZE, MAXIMIZE };
 
 //TODO: how to store basis efficiently, and in particular how to change it when columns or rows are added in order to hot start?
 
+enum class LPSolverStatus {INFEASIBLE, OPTIMAL, ERROR};
 class LPBasis{
    friend class LPSolver;
 };
@@ -70,12 +71,18 @@ class LPSolver {
    /// \return The primal solution of the solved LP
    ColVector getPrimalSolution();
 
+   ///
+   /// \return Vector containing upper bounds on the variables
+   RowVector columnUpperBounds();
+
    /// Returns the current LP objective
    /// \return Returns the current LP objective
    double objective();
 
    void clear();
    //TODO: functions for setting/getting the basis
+
+   LPSolverStatus status();
  private:
    soplex::SoPlex m_soplex;
 };

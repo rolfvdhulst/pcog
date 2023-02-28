@@ -23,6 +23,7 @@ class NodeMap {
    /// domain is given by size.
    static NodeMap inverse(const NodeMap &map, degree_type size);
 
+   static NodeMap identity(degree_type size);
    /// Gets the number of inputs allowed for this function/ the maximal node
    /// this function has as input
    [[nodiscard]] std::size_t size() const;

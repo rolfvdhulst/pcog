@@ -14,6 +14,7 @@ namespace pcog {
 
 class StableSetVariable{
  public:
+   StableSetVariable(DenseSet set) : m_set{set}{};
    [[nodiscard]] const DenseSet& set() const { return m_set;}
  private:
    DenseSet m_set;
@@ -40,8 +41,20 @@ class ColorSolver {
 
    SolverStatus solve();
 
-   const DenseGraph& preprocessedGraph() const {return m_preprocessedGraph;}
-   const std::vector<StableSetVariable>& variables() const {return m_variables;}
+   [[nodiscard]] const DenseGraph& preprocessedGraph() const {return m_preprocessedGraph;}
+   [[nodiscard]] const std::vector<StableSetVariable>& variables() const {return m_variables;}
+   bool isNewSet(const DenseSet& set) const{
+      for(const auto& var : m_variables){
+         if(var.set() == set){
+            return false;
+         }
+      }
+      return true;
+   }
+   void addStableSet(const DenseSet& set){
+      assert(m_preprocessedGraph.setIsStable(set));
+      m_variables.emplace_back(set);
+   }
  private:
    void setStatus(SolverStatus t_status);
    SolverStatus m_status = SolverStatus::NO_PROBLEM;

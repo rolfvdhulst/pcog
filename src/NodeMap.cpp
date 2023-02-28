@@ -57,4 +57,9 @@ void NodeMap::extend(Node node) { permutation_map.push_back(node); }
 void NodeMap::clear() {
    permutation_map.clear();
 }
+NodeMap NodeMap::identity(degree_type size) {
+   NodeMap map(size);
+   map.setIdentity();
+   return map;
+}
 } // namespace pcog
