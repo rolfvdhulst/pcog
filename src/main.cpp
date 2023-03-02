@@ -6,8 +6,9 @@
 #include <pcog/ColorSolver.hpp>
 
 using namespace pcog;
-int main(){
-   std::ifstream ifstream("/home/rolf/thesis/gc-instances/instances/myciel/myciel3.col");
+int main(int argc, char ** argv){
+   std::vector<std::string> arguments(argv,argv+argc);
+   std::ifstream ifstream(arguments[1]);
    std::optional<DimacsFileHeader> header = readDimacsHeader(ifstream);
    if(!header.has_value()){
       std::cout<<"Could not open or read file!\n";

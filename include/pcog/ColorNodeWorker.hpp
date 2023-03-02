@@ -9,6 +9,8 @@
 #include "DenseGraph.hpp"
 #include "LPSolver.hpp"
 #include "StableSetMaximizer.hpp"
+#include "mwss/CombinatorialStableSet.hpp"
+#include "pcog/SafeDualWeights.hpp"
 
 namespace pcog {
 
@@ -36,13 +38,17 @@ class ColorNodeWorker {
    void pricingLoop(BBNode& node, ColorSolver& t_solver);
 
    PricingResult priceColumn(BBNode& node, ColorSolver& t_solver);
-
+   void solutionCallback(const DenseSet &current_nodes, SafeWeight weight,
+    void *user_data, bool first_solution, bool &stop_solving, bool &accepted_solution);
    /// Checks if the node is cut off. If not, then decides the branching vertices u and v
    void computeBranchingVertices(BBNode& node, const ColorSolver& t_solver);
 
    void maximizeStableSet(DenseSet& set, const DenseGraph& graph);
    void addColumns(const std::vector<DenseSet>& set, ColorSolver& t_solver);
    LPSolver m_lpSolver;
+   std::unique_ptr<MaxWeightStableSetCombinatorial<SafeDualWeights>> m_mwssSolver;
+   const ColorSolver * m_colorSolver;
+   std::vector<DenseSet> m_pricedVariables;
    StableSetMaximizer m_maximizer;
    node_id m_focusNode;
 

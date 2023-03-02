@@ -84,6 +84,10 @@ set(sources
         include/pcog/SparseSet.hpp
         src/StableSetMaximizer.cpp
         include/pcog/StableSetMaximizer.hpp
+        src/Numerics.cpp
+        include/pcog/Numerics.hpp
+        src/SafeDualWeights.cpp
+        include/pcog/SafeDualWeights.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

@@ -83,6 +83,8 @@ class LPSolver {
    //TODO: functions for setting/getting the basis
 
    LPSolverStatus status();
+   std::size_t numRows();
+   std::size_t numCols();
  private:
    soplex::SoPlex m_soplex;
 };

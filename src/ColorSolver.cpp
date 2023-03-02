@@ -5,7 +5,7 @@
 #include <utility>
 
 #include "pcog/ColorSolver.hpp"
-
+#include <chrono>
 namespace pcog{
 
 void ColorSolver::setProblem(std::string t_name, DenseGraph t_graph) {
@@ -21,6 +21,7 @@ void ColorSolver::setProblem(std::string t_name, DenseGraph t_graph) {
 SolverStatus ColorSolver::solve() {
    //TODO: check if problem is initialized and handle cases where we have already solved the problem?
 
+   auto time_start = std::chrono::high_resolution_clock::now();
    //First presolve the problem
    {
       setStatus(SolverStatus::PRESOLVING);
@@ -41,6 +42,7 @@ SolverStatus ColorSolver::solve() {
          BBNode& bb_node = m_tree.popNextNode();
 
          m_worker.processNode(bb_node,*this); //TODO: ugly *this usage, use intermediary struct to save data.
+         std::cout<<"Processed node, lb: "<<bb_node.fractionalLowerBound()<<std::endl;
          if (bb_node.status() == BBNodeStatus::BRANCHED){
 
             m_tree.createChildren(bb_node.id());
@@ -48,6 +50,8 @@ SolverStatus ColorSolver::solve() {
       }
       //TODO: set status correctly here
    }
+   auto time_end = std::chrono::high_resolution_clock::now();
+   std::cout<<(time_end-time_start).count() /1e9 <<" seconds to optimize!\n";
 
    return m_status;
 }

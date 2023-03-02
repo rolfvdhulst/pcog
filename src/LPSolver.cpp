@@ -112,6 +112,11 @@ void LPSolver::clear() {
 LPSolverStatus LPSolver::status(){
 return convertStatus(m_soplex.status());
 }
-
+std::size_t LPSolver::numRows() {
+return m_soplex.numRows();
+}
+std::size_t LPSolver::numCols() {
+   return m_soplex.numCols();
+}
 
 } // namespace pcog

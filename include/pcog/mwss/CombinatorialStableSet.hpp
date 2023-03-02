@@ -385,7 +385,7 @@ MaxWeightStableSetCombinatorial<F>::clique_covering_heuristic_held(
          }
       }
       if (best_node == INVALID_NODE) {
-         // assert(false); //TODO: sometimes hit, how?
+         assert(false); //TODO: sometimes hit, how?
          break; // all nodes should have been covered
       }
       assert(total_weight + smallest_weight >= total_weight); // overflow check
