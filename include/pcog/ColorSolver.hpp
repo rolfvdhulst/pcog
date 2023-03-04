@@ -55,6 +55,32 @@ class ColorSolver {
       assert(m_preprocessedGraph.setIsStable(set));
       m_variables.emplace_back(set);
    }
+
+   void addSolution(const std::vector<std::size_t>& t_color_indices){
+#ifndef NDEBUG
+      {
+          //assert that coloring is indeed a valid coloring
+          DenseSet coveredNodes(m_preprocessedGraph.numNodes());
+          for(const auto& index : t_color_indices){
+            assert(index < m_variables.size());
+            coveredNodes.inplaceUnion(m_variables[index].set());
+          }
+          assert(coveredNodes.full());
+      }
+#endif
+
+      std::size_t ub = t_color_indices.size();
+      if(ub < m_upperBound){
+         //TODO: if upper bound was globally changed, we need to check all open nodes again
+          //prune any nodes whoms lower bound is >= the newly found upper bound
+          //Additionally, update the LP cutoff limit for the current open workers
+         m_upperBound = ub;
+         m_incumbent_index = m_colorings.size();
+         std::cout<<"New incumbent found with "<<ub<<"-coloring!\n";
+      }
+      m_colorings.push_back(t_color_indices);
+   }
+   [[nodiscard]] std::size_t globalUpperBound() const {return m_upperBound;}
  private:
    void setStatus(SolverStatus t_status);
    SolverStatus m_status = SolverStatus::NO_PROBLEM;
@@ -71,6 +97,8 @@ class ColorSolver {
    //Shared solution data, not constant. The variables constraints and colorings are in terms of the preprocessed graph.
    std::vector<StableSetVariable> m_variables;
    std::vector<std::vector<std::size_t>> m_colorings;
+   std::size_t m_incumbent_index;
+   std::size_t m_upperBound;
    BBTree m_tree;
 
    //TODO: statistics (LP its, nodes,

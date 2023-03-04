@@ -17,6 +17,8 @@ void ColorSolver::setProblem(std::string t_name, DenseGraph t_graph) {
    m_colorings.clear();
    m_tree.clear();
 
+   m_upperBound = std::numeric_limits<std::size_t>::max();
+   m_incumbent_index = std::numeric_limits<std::size_t>::max();
 }
 SolverStatus ColorSolver::solve() {
    //TODO: check if problem is initialized and handle cases where we have already solved the problem?

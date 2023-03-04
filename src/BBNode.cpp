@@ -36,7 +36,7 @@ void BBTree::createChildren(node_id t_node) {
       branchingPath.emplace_back(parent_data.firstBranchingNode(),
                                  parent_data.secondBranchNode(),
                                  BranchType::DIFFER);
-      BBNode left_node(left_id, t_node, parent_data.depth(),
+      BBNode left_node(left_id, t_node, parent_data.depth()+1,
                        parent_data.fractionalLowerBound(),
                        parent_data.lowerBound(), branchingPath);
       m_node_data.push_back(left_node);
@@ -50,7 +50,7 @@ void BBTree::createChildren(node_id t_node) {
       branchingPath.emplace_back(parent_data.firstBranchingNode(),
                                  parent_data.secondBranchNode(),
                                  BranchType::SAME);
-      BBNode right_node(right_id, t_node, parent_data.depth(),
+      BBNode right_node(right_id, t_node, parent_data.depth()+1,
                         parent_data.fractionalLowerBound(),
                         parent_data.lowerBound(), branchingPath);
       m_node_data.push_back(right_node);

@@ -84,7 +84,7 @@ RowVector LPSolver::getDualSolution() {
    return rowVector;
 }
 RowVector LPSolver::columnUpperBounds() {
-   DVector spxVector(m_soplex.numRows()); //TODO: how do we know how much space to allocate?
+   DVector spxVector(m_soplex.numCols());
    m_soplex.getUpperReal(spxVector); //TODO: error handling
    RowVector vector; //TODO reserve/allocate space
    for (int i = 0; i < spxVector.dim(); ++i) {

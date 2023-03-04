@@ -62,6 +62,7 @@ void ColorNodeWorker::setupLP(BBNode &bb_node, const ColorSolver &t_solver) {
         ++vertex) {
       m_lpSolver.addRow({}, 1.0, std::nullopt);
    }
+   assert(m_lpSolver.numRows() == m_focusGraph.numNodes());
    for (const auto &variable : t_solver.variables()) {
       std::vector<ColElem> columnEntries;
       for (const auto &node : variable.set()) {
@@ -178,6 +179,8 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node, ColorSolver &t_solver) {
 void ColorNodeWorker::pricingLoop(BBNode &node, ColorSolver &t_solver) {
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    while (true) {
+      // Run rounding heuristics / integrality check on the current LP solution
+      roundingHeuristic(node,t_solver);
       // Solve pricing problem. If new columns can be found, add them and
       // resolve the LP. Otherwise, break away from loop as we have optimally
       // solved this node, and the lower bounds are updated.
@@ -198,8 +201,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, ColorSolver &t_solver) {
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
                                                const ColorSolver &t_solver) {
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
-   auto upperBound = 4ul;
-   if(node.lowerBound() >= upperBound){
+   if(node.lowerBound() >= t_solver.globalUpperBound()){
       node.setStatus(BBNodeStatus::CUT_OFF);
       return;
    }
@@ -240,13 +242,19 @@ void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
    // First add the columns to our internal storage
    for (const auto &set : sets) {
       assert(t_solver.isNewSet(set));
+      assert(set.capacity() == m_completeFocusGraph.numNodes());
       t_solver.addStableSet(set);
    }
    // Add the columns to the LP
+   const NodeMap& mapToFocussed = m_mapToPreprocessed.oldToNewIDs;
    for (const auto &set : sets) {
       ColVector colRows;
-      for (const auto &elem : set) {
-         colRows.emplace_back(elem, 1.0); // TODO: fix conversion
+      for (const Node elem : set) {
+         Node node = mapToFocussed[elem];
+         if(node != INVALID_NODE){
+            assert(node < m_lpSolver.numRows());
+            colRows.emplace_back(node, 1.0);
+         }
       }
       // TODO: add all columns at once in soplex (more efficient)
       m_lpSolver.addColumn(
@@ -395,6 +403,57 @@ void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
    m_mwssSolver->setNodeLimit(numBBnodes + search_extra);
    assert(m_mwssSolver->getWeightFunction().setCostUpperBound(current_nodes) >
           m_mwssSolver->getWeightFunction().getOne());
+}
+void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
+   //TODO: fix
+   assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
+   double cutOffBound = static_cast<double>(t_solver.globalUpperBound())-1.0;
+   if(m_lpSolver.objective() >= (cutOffBound +1e-8) ){ //TODO: make setting
+      return;
+   }
+   const auto& focusGraph = m_focusGraph;
+   const auto& preprocessedToFocus = m_mapToPreprocessed.oldToNewIDs;
+   const auto& preprocessedGraph = t_solver.preprocessedGraph();
+   const auto& variables = t_solver.variables();
+   auto LPsol = m_lpSolver.getPrimalSolution();
+   assert(!LPsol.empty());
+
+   struct PartialSolVar{
+      PartialSolVar(std::size_t n) : index{INVALID_NODE},value{0.0},projectedSet(n){};
+      std::size_t index;
+      double value;
+      DenseSet projectedSet;
+   };
+   std::vector<PartialSolVar> projectedSolution(LPsol.size(),PartialSolVar(focusGraph.numNodes()));
+   for(std::size_t i = 0; i < LPsol.size(); i++){
+      projectedSolution[i].value = LPsol[i].value;
+      projectedSolution[i].index = LPsol[i].column;
+      preprocessedToFocus.transform(variables[LPsol[i].column].set(),projectedSolution[i].projectedSet);
+      if(!focusGraph.setIsStable(projectedSolution[i].projectedSet)){
+         if(!preprocessedGraph.setIsStable(variables[projectedSolution[i].index].set())){
+            std::cout<<"set not stable in original??"<<std::endl;
+         }
+      }
+
+   }
+   DenseSet uncoloredNodes(focusGraph.numNodes(),true);
+
+   std::vector<std::size_t> color_indices;
+   while(!uncoloredNodes.empty()){
+      auto best = std::max_element(projectedSolution.begin(),projectedSolution.end(),[&](const PartialSolVar& a, const PartialSolVar& b){
+         return a.value*(a.projectedSet.intersection(uncoloredNodes)).size() < b.value*(b.projectedSet.intersection(uncoloredNodes)).size();
+      });
+      uncoloredNodes.inplaceDifference(best->projectedSet);
+      color_indices.push_back(best->index);
+      if(color_indices.size() > LPsol.size()){
+         break;
+      }
+   }
+   if(uncoloredNodes.empty() && color_indices.size() < t_solver.globalUpperBound()){
+      //TODO: add setting for storing 'only best' solutions or also suboptimal settings
+      t_solver.addSolution(color_indices); //TODO: create solution pool
+   }
+
 }
 
 } // namespace pcog
