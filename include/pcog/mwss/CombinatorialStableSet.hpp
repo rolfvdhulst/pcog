@@ -40,7 +40,8 @@ template <WeightFunction F> class MaxWeightStableSetCombinatorial {
    void setUpperBound(weight_type ub);
    void setInfiniteUpperBound();
 
-   void setUserData(void *userData);
+   template<typename T>
+   void setUserData(T *userData);
    void setCallback(SolutionCallback callback);
    void setNodeLimit(std::size_t num_nodes);
    void setTimeLimit(std::chrono::nanoseconds nanoseconds);
@@ -486,8 +487,9 @@ template <WeightFunction F> void MaxWeightStableSetCombinatorial<F>::run() {
 }
 
 template <WeightFunction F>
-void MaxWeightStableSetCombinatorial<F>::setUserData(void *userData) {
-   user_data = userData;
+template<typename T>
+void MaxWeightStableSetCombinatorial<F>::setUserData(T *userData) {
+   user_data = reinterpret_cast<void *>(userData);
 }
 
 template <WeightFunction F>

@@ -67,7 +67,7 @@ void LPSolver::addColumn(const std::vector<ColElem>& t_colElements, double t_obj
    m_soplex.addColReal(LPCol(t_objective,col,t_upperBound,t_lowerBound));
 }
 bool LPSolver::solve() {
-
+   m_soplex.setIntParam(soplex::SoPlexBase<double>::VERBOSITY,0);
    auto status = m_soplex.optimize();
 
    return status == SPxSolver::Status::OPTIMAL;
@@ -92,12 +92,12 @@ RowVector LPSolver::columnUpperBounds() {
    }
    return vector;
 }
-ColVector LPSolver::getPrimalSolution() {
+RowVector LPSolver::getPrimalSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
    DVector spxVector(m_soplex.numCols()); //TODO: how do we know how much space to allocate?
    m_soplex.getPrimal(spxVector);
 
-   ColVector colVector; //TODO reserve/allocate space
+   RowVector colVector; //TODO reserve/allocate space
    for (int i = 0; i < spxVector.dim(); ++i) {
       colVector.emplace_back(i,spxVector[i]);
    }

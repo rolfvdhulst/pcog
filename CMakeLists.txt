@@ -88,6 +88,8 @@ set(sources
         include/pcog/Numerics.hpp
         src/SafeDualWeights.cpp
         include/pcog/SafeDualWeights.hpp
+        src/BranchingSelection.cpp
+        include/pcog/BranchingSelection.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

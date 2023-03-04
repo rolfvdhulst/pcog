@@ -26,7 +26,7 @@ struct ColElem{
    RowIdx row;
    double value;
 };
-using RowVector = std::vector<RowElem>;
+using RowVector = std::vector<RowElem>; //TODO: definitions are confusing when working with LP solutions
 using ColVector = std::vector<ColElem>;
 
 enum class ObjectiveSense { MINIMIZE, MAXIMIZE };
@@ -69,7 +69,7 @@ class LPSolver {
 
    ///
    /// \return The primal solution of the solved LP
-   ColVector getPrimalSolution();
+   RowVector getPrimalSolution();
 
    ///
    /// \return Vector containing upper bounds on the variables

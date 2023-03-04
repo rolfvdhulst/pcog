@@ -4,6 +4,7 @@
 
 #include "pcog/ColorNodeWorker.hpp"
 #include "pcog/Branching.hpp"
+#include "pcog/BranchingSelection.hpp"
 #include "pcog/ColorSolver.hpp"
 #include "pcog/mwss/CombinatorialStableSet.hpp"
 
@@ -195,7 +196,37 @@ void ColorNodeWorker::pricingLoop(BBNode &node, ColorSolver &t_solver) {
    }
 }
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
-                                               const ColorSolver &t_solver) {}
+                                               const ColorSolver &t_solver) {
+   assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
+   auto upperBound = 4ul;
+   if(node.lowerBound() >= upperBound){
+      node.setStatus(BBNodeStatus::CUT_OFF);
+      return;
+   }
+
+   auto primalSol = m_lpSolver.getPrimalSolution();
+   //Get the candidate branching edges
+   auto scoredEdges = getAllBranchingEdgesViolatedInBoth(
+       m_focusGraph, primalSol, t_solver.variables(),
+       m_mapToPreprocessed.oldToNewIDs);
+   std::mt19937 random_device(42); //TODO: make member
+   std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
+   std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
+
+   //Score them according to some function
+   scoreBranchingCandidates(
+       scoredEdges, BranchingStrategy::INTERSECTION_UNION_SIZE, m_focusGraph);
+
+   //Select pair, checking if they are violated in both branches
+   const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
+   auto best_it = selectBestPair(scoredEdges,SelectionStrategy::VIOLATED_IN_BOTH,
+                  primalSol,focusToPreprocessed,t_solver.variables());
+   assert(best_it != scoredEdges.end());
+   assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
+   //TODO: how to sort/choose between node1 /node2?
+   node.setBranchingNodes(focusToPreprocessed[best_it->node1],focusToPreprocessed[best_it->node2]);
+   node.setStatus(BBNodeStatus::BRANCHED);
+}
 void ColorNodeWorker::maximizeStableSet(DenseSet &t_set,
                                         const DenseGraph &t_graph) {
    assert(t_graph.setIsStable(t_set));
@@ -217,9 +248,10 @@ void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
       for (const auto &elem : set) {
          colRows.emplace_back(elem, 1.0); // TODO: fix conversion
       }
-      //TODO: add all columns at once in soplex (more efficient)
-      m_lpSolver.addColumn(colRows, 1.0, 0.0,
-                           soplex::infinity); // TODO: infinity/weak upper bound here
+      // TODO: add all columns at once in soplex (more efficient)
+      m_lpSolver.addColumn(
+          colRows, 1.0, 0.0,
+          soplex::infinity); // TODO: infinity/weak upper bound here
    }
 }
 PricingResult ColorNodeWorker::priceColumn(BBNode &node,
@@ -229,17 +261,21 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    assert(m_lpSolver.numRows() == m_focusGraph.numNodes());
    auto dual_values = m_lpSolver.getDualSolution();
-   std::vector<double> dualSolution(m_focusGraph.numNodes(),0.0);
+   std::vector<double> dualSolution(m_focusGraph.numNodes(), 0.0);
    for (const auto &row : dual_values) {
       dualSolution[row.column] = row.value;
    }
-   double dualSum = std::accumulate(dualSolution.begin(),dualSolution.end(),0.0);
-   double test =fabs(dualSum-m_lpSolver.objective());
-   assert(test <=1e-8); //TODO: check why the dual solution is not equal... how? How to query dual variable bounds?
-                        // Only breaks when variable upper bounds are 1.0 for DSJC125.9
-   //round up weights to prevent negative dual_values
-   for(auto& dual : dualSolution){
-      dual = std::max(dual,0.0);
+   double dualSum =
+       std::accumulate(dualSolution.begin(), dualSolution.end(), 0.0);
+   double test = fabs(dualSum - m_lpSolver.objective());
+   assert(
+       test <=
+       1e-8); // TODO: check why the dual solution is not equal... how? How to
+              // query dual variable bounds?
+              //  Only breaks when variable upper bounds are 1.0 for DSJC125.9
+   // round up weights to prevent negative dual_values
+   for (auto &dual : dualSolution) {
+      dual = std::max(dual, 0.0);
    }
    SafeDualWeights dualWeights(dualSolution);
 
@@ -252,8 +288,10 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       auto lambda = [](const DenseSet &current_nodes, SafeWeight weight,
                        void *user_data, bool first_solution, bool &stop_solving,
                        bool &accepted_solution) {
-         auto * worker = reinterpret_cast<ColorNodeWorker*>(user_data);
-         worker->solutionCallback(current_nodes,weight,user_data,first_solution,stop_solving,accepted_solution);
+         auto *worker = reinterpret_cast<ColorNodeWorker *>(user_data);
+         worker->solutionCallback(current_nodes, weight, user_data,
+                                  first_solution, stop_solving,
+                                  accepted_solution);
       };
 
       m_mwssSolver.reset();
@@ -273,29 +311,33 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    }
    // Add column(s) to the LP and resolve
 
-   //Add variables which were priced
+   // Add variables which were priced
    SafeDualWeights::weight_type bestPricingValue = 0;
-   const auto& map =m_mapToPreprocessed.oldToNewIDs;
+   const auto &map = m_mapToPreprocessed.oldToNewIDs;
    std::vector<DenseSet> newSets;
    for (auto &set : m_pricedVariables) {
       if (t_solver.isNewSet(set)) {
          DenseSet focusSet(m_focusGraph.numNodes());
-         map.transform(set,focusSet);
-         SafeDualWeights::weight_type maxPricingValue = dualWeights.setCostUpperBound(focusSet);
+         map.transform(set, focusSet);
+         SafeDualWeights::weight_type maxPricingValue =
+             dualWeights.setCostUpperBound(focusSet);
          assert(maxPricingValue > dualWeights.getOne());
-         if(maxPricingValue > bestPricingValue){
+         if (maxPricingValue > bestPricingValue) {
             bestPricingValue = maxPricingValue;
          }
-         //Don't care too much about numerical problems here, as the effect of numerical errors
-         // on the choice of new column should be very minimal in terms of performance
-         double approximatePricingValue = double(maxPricingValue) / double(dualWeights.getOne());
+         // Don't care too much about numerical problems here, as the effect of
+         // numerical errors
+         //  on the choice of new column should be very minimal in terms of
+         //  performance
+         double approximatePricingValue =
+             double(maxPricingValue) / double(dualWeights.getOne());
          assert(m_completeFocusGraph.setIsStable(set));
          assert(m_completeFocusGraph.setIsStableMaximal(set));
          newSets.push_back(set);
       }
    }
    m_pricedVariables.clear();
-   if(solvedOptimally){
+   if (solvedOptimally) {
       if (newSets.empty()) {
 
          SafeDualWeights::weight_type weightSum = dualWeights.fullCost();
@@ -311,8 +353,9 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    }
    RoundingMode mode = fegetround();
    fesetround(FE_UPWARD);
-   double pricingProblemUB = static_cast<double>(bestPricingValue) / dualWeights.getOne();
-   assert(pricingProblemUB >= 1.0 - 1e-8); //TODO: make epsilon global?
+   double pricingProblemUB =
+       static_cast<double>(bestPricingValue) / dualWeights.getOne();
+   assert(pricingProblemUB >= 1.0 - 1e-8); // TODO: make epsilon global?
    fesetround(FE_DOWNWARD);
    double derivedLowerBound = m_lpSolver.objective() / pricingProblemUB;
    fesetround(mode);
@@ -321,37 +364,37 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    node.updateLowerBound(derivedLowerBound);
 
    addColumns(newSets, t_solver);
-   return PricingResult::FOUND_COLUMN; //TODO: pick up on abort here
+   return PricingResult::FOUND_COLUMN; // TODO: pick up on abort here
 }
-void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes, SafeWeight weight,
-                      void *user_data, bool first_solution, bool &stop_solving,
-                      bool &accepted_solution){
+void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
+                                       SafeWeight weight, void *user_data,
+                                       bool first_solution, bool &stop_solving,
+                                       bool &accepted_solution) {
 
-      accepted_solution = false;
-      stop_solving = false;
+   accepted_solution = false;
+   stop_solving = false;
 
-      assert(m_focusGraph.setIsStable(current_nodes));
-      const auto &map = m_mapToPreprocessed.newToOldIDs;
-      DenseSet original_space_set(m_completeFocusGraph.numNodes());
-      map.transform(current_nodes, original_space_set);
-      assert(m_completeFocusGraph.setIsStable(original_space_set));
-      maximizeStableSet(original_space_set, m_completeFocusGraph);
-      assert(m_completeFocusGraph.setIsStable(original_space_set));
-      assert(m_completeFocusGraph.setIsStableMaximal(original_space_set));
+   assert(m_focusGraph.setIsStable(current_nodes));
+   const auto &map = m_mapToPreprocessed.newToOldIDs;
+   DenseSet original_space_set(m_completeFocusGraph.numNodes());
+   map.transform(current_nodes, original_space_set);
+   assert(m_completeFocusGraph.setIsStable(original_space_set));
+   maximizeStableSet(original_space_set, m_completeFocusGraph);
+   assert(m_completeFocusGraph.setIsStable(original_space_set));
+   assert(m_completeFocusGraph.setIsStableMaximal(original_space_set));
 
-      bool is_new_set = m_colorSolver->isNewSet(original_space_set);
-      if (!is_new_set) {
-         return;
-      }
-      accepted_solution = true;
-      m_pricedVariables.emplace_back(original_space_set);
-      std::size_t search_extra =
-          std::min(10 * m_completeFocusGraph.numNodes(), 1000ul);
-      std::size_t numBBnodes = m_mwssSolver->numBranchAndBoundNodes();
-      m_mwssSolver->setNodeLimit(numBBnodes + search_extra);
-      assert(m_mwssSolver->getWeightFunction().setCostUpperBound(
-                 current_nodes) >
-             m_mwssSolver->getWeightFunction().getOne());
+   bool is_new_set = m_colorSolver->isNewSet(original_space_set);
+   if (!is_new_set) {
+      return;
+   }
+   accepted_solution = true;
+   m_pricedVariables.emplace_back(original_space_set);
+   std::size_t search_extra =
+       std::min(10 * m_completeFocusGraph.numNodes(), 1000ul);
+   std::size_t numBBnodes = m_mwssSolver->numBranchAndBoundNodes();
+   m_mwssSolver->setNodeLimit(numBBnodes + search_extra);
+   assert(m_mwssSolver->getWeightFunction().setCostUpperBound(current_nodes) >
+          m_mwssSolver->getWeightFunction().getOne());
 }
 
 } // namespace pcog

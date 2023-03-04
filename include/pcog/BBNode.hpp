@@ -49,6 +49,10 @@ class BBNode {
       m_fractionalLowerBound = std::max(m_fractionalLowerBound,lowerBound);
       m_lowerBound = std::max(m_lowerBound,static_cast<std::size_t>(std::ceil(lowerBound)));//TODO: fix conversion?
    }
+   void setBranchingNodes(Node a, Node b) {
+      m_firstBranchNode = a;
+      m_secondBranchNode = b;
+   }
    void setStatus(BBNodeStatus t_status) {m_status = t_status;}
    /// Check if a stable set meets the branching decisions taken for this node. Used only for debugging.
    [[nodiscard]] bool verifyStableSet(const DenseSet& set) const{
