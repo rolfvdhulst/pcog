@@ -324,7 +324,7 @@ selectBestPair(const std::vector<ScoredEdge> &t_sortedPairs,
    switch (t_selectionStrategy) {
    case SelectionStrategy::VIOLATED_IN_BOTH: {
       for (auto pair_it = t_sortedPairs.begin(); pair_it != t_sortedPairs.end();
-           pair_it++) {
+           ++pair_it) {
          for (std::size_t i = 1; i < solution.size(); ++i) { //TODO: limit LP solution to only fractional variables
             for (std::size_t j = 0; j < i; ++j) {
                const auto &set_1 =

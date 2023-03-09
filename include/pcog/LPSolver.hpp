@@ -34,7 +34,9 @@ enum class ObjectiveSense { MINIMIZE, MAXIMIZE };
 //TODO: how to store basis efficiently, and in particular how to change it when columns or rows are added in order to hot start?
 
 enum class LPSolverStatus {INFEASIBLE, OPTIMAL, ERROR};
-class LPBasis{
+struct LPBasis{
+   std::vector<soplex::SPxSolver::VarStatus> rowStatus;
+   std::vector<soplex::SPxSolver::VarStatus> colStatus;
    friend class LPSolver;
 };
 /// \brief class which holds the LP solver
@@ -58,6 +60,8 @@ class LPSolver {
    /// \param t_upperBound The upper bound on the variable. Use soplex::infinity to indicate an unbounded variable
    void addColumn(const ColVector& t_colElements, double t_objective, double t_lowerBound, double t_upperBound);
 
+   void addColumns(const std::vector<ColVector>& t_columnElements, std::vector<double> objective,
+                   std::vector<double> t_lowerBound, std::vector<double> t_upperBound);
    /// Solves the linear program
    /// \return true if solved successfully, false if some error occurred.
    bool solve();
@@ -85,6 +89,11 @@ class LPSolver {
    LPSolverStatus status();
    std::size_t numRows();
    std::size_t numCols();
+
+   /// \return returns the current LP basis
+   LPBasis getLPBasis();
+
+   void setBasis(const LPBasis& basis);
  private:
    soplex::SoPlex m_soplex;
 };

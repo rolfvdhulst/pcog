@@ -63,6 +63,10 @@ void ColorNodeWorker::setupLP(BBNode &bb_node, const ColorSolver &t_solver) {
       m_lpSolver.addRow({}, 1.0, std::nullopt);
    }
    assert(m_lpSolver.numRows() == m_focusGraph.numNodes());
+   std::vector<std::vector<ColElem>> entries;
+   std::vector<double> objectives;
+   std::vector<double> lbs;
+   std::vector<double> ubs;
    for (const auto &variable : t_solver.variables()) {
       std::vector<ColElem> columnEntries;
       for (const auto &node : variable.set()) {
@@ -90,8 +94,21 @@ void ColorNodeWorker::setupLP(BBNode &bb_node, const ColorSolver &t_solver) {
             break;
          }
       }
-      m_lpSolver.addColumn(columnEntries, 1.0, 0.0, upperBound);
+      entries.push_back(columnEntries);
+      objectives.push_back(1.0);
+      lbs.push_back(0.0);
+      ubs.push_back(upperBound);
    }
+   m_lpSolver.addColumns(entries,objectives,lbs,ubs);
+
+   //set up LP Basis:
+   if(bb_node.depth() != 0){
+      LPBasis basis = bb_node.basis();
+      NodeMap previousMapping = bb_node.previousNodeMap();
+      fixLPBasis(basis,previousMapping);
+      m_lpSolver.setBasis(basis);
+   }
+
 }
 void ColorNodeWorker::farkasPricing(BBNode &t_node, ColorSolver &t_solver) {
    assert(m_lpSolver.status() == LPSolverStatus::INFEASIBLE);
@@ -207,17 +224,20 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    }
 
    auto primalSol = m_lpSolver.getPrimalSolution();
+   std::erase_if(primalSol,[](const RowElem& elem){
+      return elem.value == 0.0;
+   });
    //Get the candidate branching edges
    auto scoredEdges = getAllBranchingEdgesViolatedInBoth(
        m_focusGraph, primalSol, t_solver.variables(),
        m_mapToPreprocessed.oldToNewIDs);
    std::mt19937 random_device(42); //TODO: make member
-   std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
-   std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
    //Score them according to some function
    scoreBranchingCandidates(
        scoredEdges, BranchingStrategy::INTERSECTION_UNION_SIZE, m_focusGraph);
+   std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
+   std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
    //Select pair, checking if they are violated in both branches
    const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
@@ -238,6 +258,7 @@ void ColorNodeWorker::maximizeStableSet(DenseSet &t_set,
 }
 void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
                                  ColorSolver &t_solver) {
+   assert(t_solver.variables().size() == m_lpSolver.numCols());
 
    // First add the columns to our internal storage
    for (const auto &set : sets) {
@@ -261,6 +282,7 @@ void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
           colRows, 1.0, 0.0,
           soplex::infinity); // TODO: infinity/weak upper bound here
    }
+   assert(t_solver.variables().size() == m_lpSolver.numCols());
 }
 PricingResult ColorNodeWorker::priceColumn(BBNode &node,
                                            ColorSolver &t_solver) {
@@ -453,6 +475,42 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
       //TODO: add setting for storing 'only best' solutions or also suboptimal settings
       t_solver.addSolution(color_indices); //TODO: create solution pool
    }
+
+}
+LPBasis ColorNodeWorker::basis() {
+   return m_lpSolver.getLPBasis();
+}
+NodeMap ColorNodeWorker::mapToFocus() const {
+   return m_mapToPreprocessed.oldToNewIDs;
+}
+void ColorNodeWorker::fixLPBasis(LPBasis &basis,
+                                 const NodeMap &previous_nodemap) {
+   //fix rows of the basis
+   //Rows which were not in previous rowmaps are also not in this one
+   std::vector<soplex::SPxSolverBase<double>::VarStatus> originalNodeStatus(previous_nodemap.size(),soplex::SPxSolverBase<double>::ON_LOWER);
+   for(std::size_t i = 0; i < previous_nodemap.size();++i){
+      if(previous_nodemap[i] != INVALID_NODE){
+         originalNodeStatus[i] = basis.rowStatus[previous_nodemap[i]];
+      }
+   }
+   assert(m_lpSolver.numRows() == m_mapToPreprocessed.newToOldIDs.size());
+   basis.rowStatus.resize(m_lpSolver.numRows());
+   for(std::size_t i = 0; i < m_mapToPreprocessed.newToOldIDs.size(); ++i){
+      basis.rowStatus[i] = originalNodeStatus[m_mapToPreprocessed.newToOldIDs[i]];
+   }
+
+   //fix (extra) columns
+
+   std::size_t previousSize = basis.colStatus.size();
+   std::size_t nextSize = m_lpSolver.numCols();
+   if(previousSize < nextSize){
+      basis.colStatus.resize(nextSize);
+      for(std::size_t i = previousSize; i < nextSize; ++i){
+         basis.colStatus[i] = soplex::SPxSolverBase<double>::ON_LOWER;
+      }
+   }
+
+   assert(basis.rowStatus.size() == m_lpSolver.numRows() && basis.colStatus.size() == m_lpSolver.numCols());
 
 }
 

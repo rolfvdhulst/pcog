@@ -7,6 +7,7 @@
 #include "Branching.hpp"
 #include <queue>
 #include <utility>
+#include "LPSolver.hpp"
 
 namespace pcog {
 enum class BBNodeStatus {
@@ -21,15 +22,19 @@ using node_id =
     std::size_t; // TODO: rename to something not confusable with graph nodes
 static constexpr node_id INVALID_BB_NODE = std::numeric_limits<node_id>::max();
 
+class ColorNodeWorker;
+
 class BBNode {
  public:
    BBNode(node_id id, node_id parent_id, node_id depth,
           double fractionalLowerBound, std::size_t lowerBound,
-          std::vector<BranchData> branchInfo)
+          std::vector<BranchData> branchInfo,
+          LPBasis t_basis, NodeMap t_map)
        : m_id{id}, m_parent_id{parent_id}, m_depth{depth},
          m_branchingDecisions{std::move(branchInfo)}, m_status{BBNodeStatus::INITIALIZED},
          m_fractionalLowerBound{fractionalLowerBound}, m_lowerBound{lowerBound},
-         m_firstBranchNode{INVALID_NODE},m_secondBranchNode{INVALID_NODE}
+         m_firstBranchNode{INVALID_NODE},m_secondBranchNode{INVALID_NODE},
+         m_previousNodeMap(std::move(t_map)),m_initialBasis(std::move(t_basis))
          {};
    [[nodiscard]] node_id id() const { return m_id; }
    [[nodiscard]] double fractionalLowerBound() const { return m_fractionalLowerBound; }
@@ -64,6 +69,8 @@ class BBNode {
       }
       return true;
    }
+   [[nodiscard]] LPBasis basis() const;
+   [[nodiscard]] NodeMap previousNodeMap() const {return m_previousNodeMap;}
  private:
    node_id m_id;
    node_id m_parent_id;
@@ -75,6 +82,9 @@ class BBNode {
    std::size_t m_lowerBound;
    Node m_firstBranchNode;
    Node m_secondBranchNode;
+
+   NodeMap m_previousNodeMap; //needed to interpret previous basis
+   LPBasis m_initialBasis;
    // TODO: store basis and other information
 };
 
@@ -83,14 +93,16 @@ class BBTree {
  public:
    /// Clear all the information stored in this object.
    void clear();
-   void createRootNode();
+   void createRootNode(std::size_t numRootGraphNodes);
 
    [[nodiscard]] bool hasOpenNodes() const;
 
    BBNode &popNextNode();
 
-   void createChildren(node_id t_node);
+   void createChildren(node_id t_node, ColorNodeWorker& t_nodeWorker);
 
+   [[nodiscard]] std::size_t numOpenNodes() const;
+   [[nodiscard]] std::size_t numTotalNodes() const;
  private:
    // TODO: for now we store the entire b&b tree, but by increasing the
    // per-memory, we can get away with only storing the open nodes Evaluate if

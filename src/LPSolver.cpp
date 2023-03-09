@@ -94,7 +94,7 @@ RowVector LPSolver::columnUpperBounds() {
 }
 RowVector LPSolver::getPrimalSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
-   DVector spxVector(m_soplex.numCols()); //TODO: how do we know how much space to allocate?
+   DVector spxVector(m_soplex.numCols());
    m_soplex.getPrimal(spxVector);
 
    RowVector colVector; //TODO reserve/allocate space
@@ -117,6 +117,35 @@ return m_soplex.numRows();
 }
 std::size_t LPSolver::numCols() {
    return m_soplex.numCols();
+}
+LPBasis LPSolver::getLPBasis() {
+   LPBasis basis;
+   basis.rowStatus.resize(m_soplex.numRows());
+   basis.colStatus.resize(m_soplex.numCols());
+   m_soplex.getBasis(basis.rowStatus.data(),basis.colStatus.data());
+
+   return basis;
+}
+void LPSolver::setBasis(const LPBasis &basis) {
+
+   m_soplex.setBasis(basis.rowStatus.data(),basis.colStatus.data());
+}
+void LPSolver::addColumns(const std::vector<ColVector> &t_columnElements,
+                          std::vector<double> objective,
+                          std::vector<double> t_lowerBound,
+                          std::vector<double> t_upperBound) {
+   if(t_columnElements.empty()){
+      return;
+   }
+   LPColSetReal colSet;
+   for(std::size_t i = 0; i < t_columnElements.size(); ++i){
+      DSVector col(static_cast<int>(t_columnElements[i].size()));
+      for(const auto& elem : t_columnElements[i]){
+         col.add(elem.row,elem.value);
+      }
+      colSet.add(LPCol(objective[i],col,t_upperBound[i],t_lowerBound[i]));
+   }
+   m_soplex.addColsReal(colSet);
 }
 
 } // namespace pcog

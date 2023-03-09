@@ -38,17 +38,18 @@ SolverStatus ColorSolver::solve() {
    {
       setStatus(SolverStatus::SOLVING);
       //initialize tree
-      m_tree.createRootNode();
+      m_tree.createRootNode(m_preprocessedGraph.numNodes());
       //Branch-and-bound loop
       while(m_tree.hasOpenNodes()){
          BBNode& bb_node = m_tree.popNextNode();
 
          m_worker.processNode(bb_node,*this); //TODO: ugly *this usage, use intermediary struct to save data.
-         std::cout<<"Processed node, lb: "<<bb_node.fractionalLowerBound()<<std::endl;
+         std::cout<<"Processed node, lb: "<<bb_node.fractionalLowerBound()<<" open nodes: "<<m_tree.numOpenNodes()<<" total nodes: "<<m_tree.numTotalNodes()<<" vars: "<< m_variables.size()<<std::endl;
          if (bb_node.status() == BBNodeStatus::BRANCHED){
 
-            m_tree.createChildren(bb_node.id());
+            m_tree.createChildren(bb_node.id(),m_worker);
          }
+
       }
       //TODO: set status correctly here
    }

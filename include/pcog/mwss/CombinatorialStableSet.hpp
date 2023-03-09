@@ -512,9 +512,9 @@ struct UniformWeightFunction {
    using weight_type = std::size_t;
    static constexpr WeightFunctionType function_type =
        WeightFunctionType::UNIFORM_COST;
-   static weight_type nodeCost(Node node) { return 1; };
+   static weight_type nodeCost(Node ) { return 1; };
    static weight_type setCost(const DenseSet &set) { return set.size(); };
-   static weight_type dualNodeCost(Node node) { return 1; };
+   static weight_type dualNodeCost(Node ) { return 1; };
    static weight_type fixedDualCost() { return 0; };
 };
 

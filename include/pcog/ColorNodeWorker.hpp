@@ -30,6 +30,8 @@ class ColorNodeWorker {
    ColorNodeWorker() : m_colorSolver{nullptr},m_maximizer{42}, m_focusNode{INVALID_BB_NODE}{};//TODO: add seed to constructor
 
    void processNode(BBNode& node, ColorSolver& t_solver);
+   LPBasis basis();
+   NodeMap mapToFocus() const;
  private:
    /// Performs 'node preprocessing', diminishing the size of the graphs
    void setupGraphs(BBNode& node, const ColorSolver& t_solver);
@@ -44,6 +46,7 @@ class ColorNodeWorker {
    /// Checks if the node is cut off. If not, then decides the branching vertices u and v
    void computeBranchingVertices(BBNode& node, const ColorSolver& t_solver);
 
+   void fixLPBasis(LPBasis& basis, const NodeMap& previous_nodemap);
 
    void maximizeStableSet(DenseSet& set, const DenseGraph& graph);
    void addColumns(const std::vector<DenseSet>& set, ColorSolver& t_solver);
