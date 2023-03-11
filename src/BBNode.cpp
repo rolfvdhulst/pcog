@@ -28,9 +28,9 @@ BBNode &BBTree::popNextNode() {
    return m_node_data[node];
 }
 void BBTree::createChildren(node_id t_node, ColorNodeWorker &t_nodeWorker) {
-   BBNode &parent_data = m_node_data[t_node];
 
    {
+      BBNode &parent_data = m_node_data[t_node];
       node_id left_id = m_node_data.size();
       // insert node according to selection rule
       std::vector<BranchData> branchingPath = parent_data.branchDecisions();
@@ -45,6 +45,7 @@ void BBTree::createChildren(node_id t_node, ColorNodeWorker &t_nodeWorker) {
       m_open_nodes.push_back(left_id); // TODO: insert according to node ordering
    }
    {
+      BBNode &parent_data = m_node_data[t_node];
       node_id right_id = m_node_data.size();
       // insert node according to selection rule
       std::vector<BranchData> branchingPath = parent_data.branchDecisions();
