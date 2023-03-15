@@ -41,7 +41,12 @@ std::vector<ScoredEdge> getAllBranchingEdges(const DenseGraph &graph) {
 
 void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
                               BranchingStrategy strategy,
-                              const DenseGraph &graph) {
+                              const DenseGraph &graph,
+                              LPSolver& t_lpSolver,
+                              const std::vector<StableSetVariable>& variables,
+                              const NodeMap& mapToPreprocessed,
+                              std::size_t numPreprocessedNodes
+                              ) {
    switch (strategy) {
    case BranchingStrategy::INTERSECTION_SIZE:
       for (auto &candidate : candidates) {
@@ -92,26 +97,43 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
    case BranchingStrategy::TRIANGLES_ADDED_SCALED:
       scoreScaledTriangles(candidates, graph);
       return;
-//   case BranchingStrategy::HELDS_RULE: //TODO: fix
-//      scoreHeldsRule(candidates, graph, problem, scip);
-//      return;
-//   case BranchingStrategy::RANDOMLY:
-//      return;
-//   case BranchingStrategy::DUAL_MAX:
-//      scoreDualMaximization(candidates, graph, problem, scip);
-//      return;
-//   case BranchingStrategy::DUAL_MIN:
-//      scoreDualMinimization(candidates, graph, problem, scip);
-//      return;
-//   case BranchingStrategy::FRACTIONAL:
-//      scoreFractional(candidates, graph, problem, scip);
-//      return;
-//   case BranchingStrategy::REMOVAL_SIZE:
-//      scoreRemovalSize(candidates, graph, problem, scip);
-//      return;
-//   case BranchingStrategy::MIN_REMOVAL_SIZE:
-//      scoreMinRemovalSize(candidates, graph, problem, scip);
-//      return;
+   case BranchingStrategy::HELDS_RULE: //TODO: fix
+   {
+      auto lpSol = t_lpSolver.getPrimalSolution();
+      scoreHeldsRule(candidates,lpSol,variables,mapToPreprocessed);
+      return;
+   }
+   case BranchingStrategy::RANDOMLY:
+      return;
+   case BranchingStrategy::DUAL_MAX:{
+      auto dualValues = t_lpSolver.getDualSolution();
+      scoreDualMaximization(candidates,dualValues);
+      return;
+   }
+
+   case BranchingStrategy::DUAL_MIN:{
+      auto dualValues = t_lpSolver.getDualSolution();
+      scoreDualMinimization(candidates,dualValues);
+      return;
+   }
+
+   case BranchingStrategy::FRACTIONAL:{
+      auto lpSol = t_lpSolver.getPrimalSolution();
+      scoreFractional(candidates,lpSol,variables,mapToPreprocessed,numPreprocessedNodes);
+      return;
+   }
+   case BranchingStrategy::REMOVAL_SIZE:{
+      auto lpSol = t_lpSolver.getPrimalSolution();
+      scoreRemovalSize(candidates,lpSol,variables,mapToPreprocessed);
+      return;
+   }
+
+   case BranchingStrategy::MIN_REMOVAL_SIZE:{
+      auto lpSol = t_lpSolver.getPrimalSolution();
+      scoreMinRemovalSize(candidates,lpSol,variables,mapToPreprocessed);
+      return;
+   }
+
    }
 }
 void scoreScaledTriangles(std::vector<ScoredEdge> &candidates,
@@ -148,135 +170,117 @@ void scoreScaledTriangles(std::vector<ScoredEdge> &candidates,
    }
 }
 
-//void scoreHeldsRule(std::vector<ScoredEdge> &candidates,
-//                    const DenseGraph &graph, SCIPProblem *probdata,
-//                    SCIP *scip) {
-//   const auto lpsol = probdata->getLPSolution(scip);
-//   const auto &variables = probdata->getVariables();
-//   const auto &mapToPreprocessed = probdata->getFocusToPreprocessedMap();
-//   for (auto &candidate : candidates) {
-//      Node oldNode1 = mapToPreprocessed[candidate.node1];
-//      Node oldNode2 = mapToPreprocessed[candidate.node2];
-//      double numerator = 0.0;
-//      double denominator = 0.0;
-//      for (const auto &var : lpsol.solutionVars) {
-//         const auto &variable = variables[var.index];
-//         bool contains_1 = variable.set().contains(oldNode1);
-//         bool contains_2 = variable.set().contains(oldNode2);
-//         if (contains_1 && contains_2) {
-//            numerator += var.value;
-//         }
-//         if (contains_1) {
-//            denominator += var.value;
-//         }
-//         if (contains_2) {
-//            denominator += var.value;
-//         }
-//      }
-//      constexpr double alpha = 0.55;
-//      candidate.score =
-//          -fabs(numerator / (0.5 * denominator) -
-//                alpha); // negate the score (we want to be as close as possible
-//                        // to the alpha fraction)
-//   }
-//}
-//
-//void scoreDualMaximization(std::vector<ScoredEdge> &candidates,
-//                           const DenseGraph &graph, SCIPProblem *problem,
-//                           SCIP *scip) {
-//   const auto &dual_values = problem->getFocusGraphDualValues(scip);
-//   for (auto &candidate : candidates) {
-//      double dual_sum = dual_values.node_dual_weight[candidate.node1] +
-//                        dual_values.node_dual_weight[candidate.node2];
-//      candidate.score = dual_sum;
-//   }
-//}
-//void scoreDualMinimization(std::vector<ScoredEdge> &candidates,
-//                           const DenseGraph &graph, SCIPProblem *problem,
-//                           SCIP *scip) {
-//   const auto &dual_values = problem->getFocusGraphDualValues(scip);
-//   for (auto &candidate : candidates) {
-//      double dual_sum = dual_values.node_dual_weight[candidate.node1] +
-//                        dual_values.node_dual_weight[candidate.node2];
-//      candidate.score = -dual_sum;
-//   }
-//}
-//
-//void scoreFractional(std::vector<ScoredEdge> &candidates,
-//                     const DenseGraph &graph, SCIPProblem *probdata,
-//                     SCIP *scip) {
-//   const auto lpsol = probdata->getLPSolution(scip);
-//   const auto &variables = probdata->getVariables();
-//   const auto &mapToPreprocessed = probdata->getFocusToPreprocessedMap();
-//   std::size_t num_nodes_original =
-//       probdata->getCompleteFocusGraph().numNodes();
-//   std::vector<double> fractionalities(num_nodes_original, 0.0);
-//   for (const auto &var : lpsol.solutionVars) {
-//      const auto &variable = variables[var.index];
-//      double fractionality = std::min(SCIPceil(scip, var.value) - var.value,
-//                                      var.value - SCIPfloor(scip, var.value));
-//      for (const auto &node : variable.set()) {
-//         fractionalities[node] = std::max(fractionalities[node], fractionality);
-//      }
-//   }
-//   for (auto &candidate : candidates) {
-//      Node oldNode1 = mapToPreprocessed[candidate.node1];
-//      Node oldNode2 = mapToPreprocessed[candidate.node2];
-//      candidate.score = fractionalities[oldNode1] + fractionalities[oldNode2];
-//   }
-//   // TODO: how to fix/prevent same set from producing high score? this needs
-//   // some thought...
-//}
-//void scoreRemovalSize(std::vector<ScoredEdge> &candidates,
-//                      const DenseGraph &graph, SCIPProblem *probdata,
-//                      SCIP *scip) {
-//
-//   const auto lpsol = probdata->getLPSolution(scip);
-//   const auto &variables = probdata->getVariables();
-//   const auto &mapToPreprocessed = probdata->getFocusToPreprocessedMap();
-//   for (auto &candidate : candidates) {
-//      Node oldNode1 = mapToPreprocessed[candidate.node1];
-//      Node oldNode2 = mapToPreprocessed[candidate.node2];
-//      double sum = 0.0;
-//      for (const auto &var : lpsol.solutionVars) {
-//         const auto &variable = variables[var.index];
-//         bool contains_1 = variable.set().contains(oldNode1);
-//         bool contains_2 = variable.set().contains(oldNode2);
-//         if (contains_1 || contains_2) {
-//            sum += var.value; // DIFFER is broken if both are true, SAME if
-//                              // exactly one is true
-//         }
-//      }
-//      candidate.score = sum;
-//   }
-//}
-//
-//void scoreMinRemovalSize(std::vector<ScoredEdge> &candidates,
-//                         const DenseGraph &graph, SCIPProblem *probdata,
-//                         SCIP *scip) {
-//
-//   const auto lpsol = probdata->getLPSolution(scip);
-//   const auto &variables = probdata->getVariables();
-//   const auto &mapToPreprocessed = probdata->getFocusToPreprocessedMap();
-//   for (auto &candidate : candidates) {
-//      Node oldNode1 = mapToPreprocessed[candidate.node1];
-//      Node oldNode2 = mapToPreprocessed[candidate.node2];
-//      double sum = 0.0;
-//      for (const auto &var : lpsol.solutionVars) {
-//         const auto &variable = variables[var.index];
-//         bool contains_1 = variable.set().contains(oldNode1);
-//         bool contains_2 = variable.set().contains(oldNode2);
-//         if (contains_1 || contains_2) {
-//            sum += var.value; // DIFFER is broken if both are true, SAME if only
-//                              // one is true
-//         }
-//      }
-//      if (sum == 0.0) { // no violation; we don't like this, so we punish it.
-//         sum = -1e9;
-//      }
-//      candidate.score = -sum;
-//   }
-//}
+void scoreHeldsRule(std::vector<ScoredEdge> &candidates,
+                    const RowVector & lpSolution,
+                    const std::vector<StableSetVariable>& variables,
+                    const NodeMap& mapToPreprocessed) {
+   for (auto &candidate : candidates) {
+      Node oldNode1 = mapToPreprocessed[candidate.node1];
+      Node oldNode2 = mapToPreprocessed[candidate.node2];
+      double numerator = 0.0;
+      double denominator = 0.0;
+      for (const auto &var : lpSolution) {
+         const auto &variable = variables[var.column];
+         bool contains_1 = variable.set().contains(oldNode1);
+         bool contains_2 = variable.set().contains(oldNode2);
+         if (contains_1 && contains_2) {
+            numerator += var.value;
+         }
+         if (contains_1) {
+            denominator += var.value;
+         }
+         if (contains_2) {
+            denominator += var.value;
+         }
+      }
+      constexpr double alpha = 0.55;
+      // negate the score (we want to be as close as possible to the alpha fraction)
+      candidate.score =-fabs(numerator / (0.5 * denominator) - alpha);
+   }
+}
+
+void scoreDualMaximization(std::vector<ScoredEdge> &t_candidates,
+                           const RowVector& t_dualValues) {
+   for (auto &candidate : t_candidates) {
+      double dual_sum = t_dualValues[candidate.node1].value + t_dualValues[candidate.node2].value;
+      candidate.score = dual_sum;
+   }
+}
+void scoreDualMinimization(std::vector<ScoredEdge> &t_candidates,
+                           const RowVector& t_dualValues) {
+   for (auto &candidate : t_candidates) {
+      double dual_sum = t_dualValues[candidate.node1].value + t_dualValues[candidate.node2].value;
+      candidate.score = -dual_sum;
+   }
+}
+void scoreFractional(std::vector<ScoredEdge> &candidates,
+                     const RowVector & lpSolution,
+                     const std::vector<StableSetVariable>& variables,
+                     const NodeMap& mapToPreprocessed,
+                     std::size_t numPreprocessedGraphNodes) {
+
+   std::vector<double> fractionalities(numPreprocessedGraphNodes, 0.0);
+   for (const auto &var : lpSolution) {
+      const auto &variable = variables[var.column];
+//      assert(var.value <= 1.0 && var.value >= 0.0); //TODO: margins OR rounding
+      double fractionality = std::min(1.0 - var.value,var.value);
+      for (const auto &node : variable.set()) {
+         fractionalities[node] = std::max(fractionalities[node], fractionality);
+      }
+   }
+   for (auto &candidate : candidates) {
+      Node oldNode1 = mapToPreprocessed[candidate.node1];
+      Node oldNode2 = mapToPreprocessed[candidate.node2];
+      candidate.score = fractionalities[oldNode1] + fractionalities[oldNode2];
+   }
+}
+void scoreRemovalSize(std::vector<ScoredEdge> &candidates,
+                      const RowVector & lpSolution,
+                      const std::vector<StableSetVariable>& variables,
+                      const NodeMap& mapToPreprocessed) {
+
+   for (auto &candidate : candidates) {
+      Node oldNode1 = mapToPreprocessed[candidate.node1];
+      Node oldNode2 = mapToPreprocessed[candidate.node2];
+      double sum = 0.0;
+      for (const auto &var : lpSolution) {
+         const auto &variable = variables[var.column];
+         bool contains_1 = variable.set().contains(oldNode1);
+         bool contains_2 = variable.set().contains(oldNode2);
+         if (contains_1 || contains_2) {
+            sum += var.value; // DIFFER is broken if both are true, SAME if
+                              // exactly one is true
+         }
+      }
+      candidate.score = sum;
+   }
+}
+
+void scoreMinRemovalSize(std::vector<ScoredEdge> &candidates,
+                         const RowVector & lpSolution,
+                         const std::vector<StableSetVariable>& variables,
+                         const NodeMap& mapToPreprocessed) {
+
+   for (auto &candidate : candidates) {
+      Node oldNode1 = mapToPreprocessed[candidate.node1];
+      Node oldNode2 = mapToPreprocessed[candidate.node2];
+      double sum = 0.0;
+      for (const auto &var : lpSolution) {
+         const auto &variable = variables[var.column];
+         bool contains_1 = variable.set().contains(oldNode1);
+         bool contains_2 = variable.set().contains(oldNode2);
+         if (contains_1 || contains_2) {
+            sum += var.value; // DIFFER is broken if both are true, SAME if
+                              // exactly one is true
+         }
+      }
+      //No violation; we want to disallow pairs with no violation
+      if(fabs(sum) <= 1e-8){ //TODO: move tolerances to a central options spot
+         sum = 1e9; //penalize significantly
+      }
+      candidate.score = -sum;
+   }
+}
 
 std::vector<ScoredEdge> getAllBranchingEdgesViolatedInBoth(
     const DenseGraph &focusGraph, const RowVector &lp_sol,

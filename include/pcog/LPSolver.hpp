@@ -31,8 +31,6 @@ using ColVector = std::vector<ColElem>;
 
 enum class ObjectiveSense { MINIMIZE, MAXIMIZE };
 
-//TODO: how to store basis efficiently, and in particular how to change it when columns or rows are added in order to hot start?
-
 enum class LPSolverStatus {INFEASIBLE, OPTIMAL, ERROR};
 struct LPBasis{
    std::vector<soplex::SPxSolver::VarStatus> rowStatus;
@@ -84,7 +82,6 @@ class LPSolver {
    double objective();
 
    void clear();
-   //TODO: functions for setting/getting the basis
 
    LPSolverStatus status();
    std::size_t numRows();

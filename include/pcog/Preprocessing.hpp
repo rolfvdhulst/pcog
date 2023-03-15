@@ -80,11 +80,11 @@ removeLowDegreeVerticesClique(const DenseGraph &graph, DenseSet &present_nodes,
 /// \param graph The graph to modify. Only the graph induced by present_nodes is
 /// considered.
 /// \param present_nodes The nodes which induce the subgraph. Modified if any nodes are removed.
-/// \param clique The clique to use for preprocessing
+/// \param checkForDominatedVertices The vertices which should be checked if they are dominated by another vertex
 /// \return A vector with the removed nodes
 std::vector<PreprocessedNode>
 removeDominatedVerticesClique(const DenseGraph &graph, DenseSet &present_nodes,
-                              const DenseSet &clique);
+                              const DenseSet &checkForDominatedVertices);
 
 /// Preprocess low degree vertices from the graph.  This function modifies the
 /// present nodes, and only considers the graph induced by present_nodes.

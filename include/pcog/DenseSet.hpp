@@ -174,13 +174,20 @@ class DenseSet {
    /// returned
    [[nodiscard]] Element find_next(Element node) const;
 
-   // TODO: document iterator type?
+
+   /// A const 'iterator' type, iterating over the elements of the dense set.
+   /// Is not a 'true' iterator, since it only makes copies of the elements.
    class ConstIterator {
     public:
+      /// Create an iterator on a dense set, starting from a position
       ConstIterator(const DenseSet &t_set, Element t_position);
+      /// Dereferences the current element, creating a copy.
       [[nodiscard]] Element operator*() const;
+      /// Equality comparison between two iterators
       bool operator==(const ConstIterator &t_other) const;
+      /// Inequality comparison of two iterators
       bool operator!=(const ConstIterator &t_other) const;
+      /// Increments the iterator to the next element of the dense set.
       ConstIterator &operator++() {
          m_node = m_denseSet.find_next(m_node);
          return *this;

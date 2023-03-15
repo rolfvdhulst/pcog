@@ -79,9 +79,8 @@ void ColorNodeWorker::setupLP(BBNode &bb_node, const ColorSolver &t_solver) {
          }
       }
 
-      // TODO: experiment with upper bound set to infinity (e.g. the 'virtual'
-      // bounds scip uses) Fix variables to zero from ryan-foster branching
-      double upperBound = soplex::infinity;
+      // Fix variables to zero from ryan-foster branching
+      double upperBound = soplex::infinity; // TODO: experiment with finite upper bound
       const auto &set = variable.set();
       for (const auto &decision : bb_node.branchDecisions()) {
          // Check if the stable set is viable in the Subproblem
@@ -235,7 +234,8 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
 
    //Score them according to some function
    scoreBranchingCandidates(
-       scoredEdges, BranchingStrategy::INTERSECTION_UNION_SIZE, m_focusGraph);
+       scoredEdges, BranchingStrategy::INTERSECTION_UNION_SIZE, m_focusGraph,
+       m_lpSolver,t_solver.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
    std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
    std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
@@ -430,7 +430,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
    //TODO: fix
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    double cutOffBound = static_cast<double>(t_solver.globalUpperBound())-1.0;
-   if(m_lpSolver.objective() >= (cutOffBound +1e-8) ){ //TODO: make setting
+   if(m_lpSolver.objective() >= (cutOffBound +1e-8) ){
       return;
    }
    const auto& focusGraph = m_focusGraph;

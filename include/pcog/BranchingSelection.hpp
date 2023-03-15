@@ -25,8 +25,7 @@ enum class BranchingStrategy : int {
    FRACTIONAL = 10,
    REMOVAL_SIZE = 11,
    MIN_REMOVAL_SIZE = 12,
-   MAXIMUM_STRATEGY = 12 // TODO MAKE SURE TO UPDATE THIS CORRECTLY WHEN
-                         // UPDATING THE STRATEGIES!
+   MAXIMUM_STRATEGY = 12 // Update this correctly when ever adding values to this enum
 };
 
 enum class SelectionStrategy {
@@ -61,29 +60,41 @@ std::vector<ScoredEdge> getAllBranchingEdgesViolatedInBoth(
     const DenseGraph &graph, const RowVector &lp_sol,
     const std::vector<StableSetVariable> &variables, const NodeMap &toFocussed);
 
-void scoreBranchingCandidates(std::vector<ScoredEdge> &edges,
+void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
                               BranchingStrategy strategy,
-                              const DenseGraph &graph);
+                              const DenseGraph &graph,
+                              LPSolver& t_lpSolver,
+                              const std::vector<StableSetVariable>& variables,
+                              const NodeMap& mapToPreprocessed,
+                              std::size_t numPreprocessedNodes);
+
 void scoreScaledTriangles(std::vector<ScoredEdge> &edges,
                           const DenseGraph &graph);
-//void scoreHeldsRule(std::vector<ScoredEdge> &edges, const DenseGraph &graph,
-//                    SCIPProblem *problem, SCIP *scip);
-//void scoreDualMaximization(std::vector<ScoredEdge> &edges,
-//                           const DenseGraph &graph, SCIPProblem *problem,
-//                           SCIP *scip);
-//void scoreDualMinimization(std::vector<ScoredEdge> &edges,
-//                           const DenseGraph &graph, SCIPProblem *problem,
-//                           SCIP *scip);
-//void scoreRemovalSize(std::vector<ScoredEdge> &candidates,
-//                      const DenseGraph &graph, SCIPProblem *probdata,
-//                      SCIP *scip);
-//void scoreMinRemovalSize(std::vector<ScoredEdge> &candidates,
-//                         const DenseGraph &graph, SCIPProblem *probdata,
-//                         SCIP *scip);
-//
-//void scoreFractional(std::vector<ScoredEdge> &candidates,
-//                     const DenseGraph &graph, SCIPProblem *probdata,
-//                     SCIP *scip);
+void scoreHeldsRule(std::vector<ScoredEdge> &candidates,
+                    const RowVector & lpSolution,
+                    const std::vector<StableSetVariable>& variables,
+                    const NodeMap& mapToPreprocessed);
+
+void scoreDualMaximization(std::vector<ScoredEdge> &t_candidates,
+                           const RowVector & t_dualValues);
+void scoreDualMinimization(std::vector<ScoredEdge> &t_candidates,
+                           const RowVector & t_dualValues);
+
+void scoreRemovalSize(std::vector<ScoredEdge> &candidates,
+                      const RowVector & lpSolution,
+                      const std::vector<StableSetVariable>& variables,
+                      const NodeMap& mapToPreprocessed);
+
+void scoreMinRemovalSize(std::vector<ScoredEdge> &candidates,
+                         const RowVector & lpSolution,
+                         const std::vector<StableSetVariable>& variables,
+                         const NodeMap& mapToPreprocessed);
+
+void scoreFractional(std::vector<ScoredEdge> &candidates,
+                     const RowVector & lpSolution,
+                     const std::vector<StableSetVariable>& variables,
+                     const NodeMap& mapToPreprocessed,
+                     std::size_t numPreprocessedGraphNodes);
 
 } // namespace pcog
 #endif // PCOG_INCLUDE_PCOG_BRANCHINGSELECTION_HPP

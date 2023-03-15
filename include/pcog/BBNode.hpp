@@ -18,8 +18,7 @@ enum class BBNodeStatus {
              // bound
 };
 
-using node_id =
-    std::size_t; // TODO: rename to something not confusable with graph nodes
+using node_id = std::size_t;
 static constexpr node_id INVALID_BB_NODE = std::numeric_limits<node_id>::max();
 
 class ColorNodeWorker;
@@ -85,7 +84,6 @@ class BBNode {
 
    NodeMap m_previousNodeMap; //needed to interpret previous basis
    LPBasis m_initialBasis;
-   // TODO: store basis and other information
 };
 
 enum class NodeSelectionStrategy { DFS, BFS, BEST_BOUND };
