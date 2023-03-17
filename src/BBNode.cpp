@@ -9,8 +9,7 @@ namespace pcog {
 void BBTree::clear() {
    m_node_data.clear();
    m_open_nodes.clear();
-   m_selection_strategy =
-       NodeSelectionStrategy::DFS; // TODO: reset selection strategy?
+   m_selection_strategy = NodeSelectionStrategy::DFS; // TODO: reset selection strategy?
 }
 void BBTree::createRootNode(std::size_t numRootGraphNodes) {
    assert(m_node_data.empty());

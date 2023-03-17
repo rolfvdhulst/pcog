@@ -57,10 +57,9 @@ constructBranchedFullGraph(const DenseGraph &graph,
              branched_full_graph.neighbourhood(data.first)
                  .setUnion(branched_full_graph.neighbourhood(data.second));
 #endif
-         // TODO: below code for adding edges may be somewhat inefficient? Still could be better than setting too many individual bits, however.
+         // TODO: below code for adding edges could be more efficient
          const DenseSet &first_neighbourhood =
-             branched_full_graph.neighbourhood(
-                 data.first); // TODO: branched_full_graph or original graph?
+             branched_full_graph.neighbourhood(data.first);
          const DenseSet &second_neighbourhood =
              branched_full_graph.neighbourhood(data.second);
 
@@ -70,15 +69,12 @@ constructBranchedFullGraph(const DenseGraph &graph,
              first_neighbourhood.difference(second_neighbourhood);
 
          // here we do not need to worry about other same classes because all nodes within the same class are both (dis)connected to the two branching nodes
-         for (const Node &node : same_classes[data.first]) {
-            for (const auto &other_node : addToFirst) {
-               branched_full_graph.addEdge(node, other_node);
-            }
+         //TODO: benchmark
+         for(const Node& node : same_classes[data.first]){
+            branched_full_graph.addEdges(node,addToFirst);
          }
-         for (const Node &node : same_classes[data.second]) {
-            for (const auto &other_node : addToSecond) {
-               branched_full_graph.addEdge(node, other_node);
-            }
+         for(const Node& node : same_classes[data.second]){
+            branched_full_graph.addEdges(node,addToSecond);
          }
 
          // update the representative and the same class (data.second is 'deleted' later as well!).

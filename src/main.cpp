@@ -22,5 +22,6 @@ int main(int argc, char ** argv){
    }
    solver.setProblem("test",graph.value());
    solver.solve();
+   solver.printStatistics(std::cout);
    return EXIT_SUCCESS;
 }

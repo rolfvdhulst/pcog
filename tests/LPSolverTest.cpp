@@ -22,7 +22,7 @@ TEST(LPSolver, basicProblem) {
 
    EXPECT_EQ(solver.objective(),6.6);
    pcog::RowVector dualSolution = solver.getDualSolution();
-   pcog::ColVector primalSolution = solver.getPrimalSolution();
+   pcog::RowVector primalSolution = solver.getPrimalSolution();
    ASSERT_EQ(dualSolution.size(),1);
    ASSERT_EQ(primalSolution.size(),2);
    EXPECT_DOUBLE_EQ(primalSolution[0].value,1.0);

@@ -223,9 +223,6 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    }
 
    auto primalSol = m_lpSolver.getPrimalSolution();
-   std::erase_if(primalSol,[](const RowElem& elem){
-      return elem.value == 0.0;
-   });
    //Get the candidate branching edges
    auto scoredEdges = getAllBranchingEdgesViolatedInBoth(
        m_focusGraph, primalSol, t_solver.variables(),
@@ -427,10 +424,10 @@ void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
           m_mwssSolver->getWeightFunction().getOne());
 }
 void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
-   //TODO: fix
+
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    double cutOffBound = static_cast<double>(t_solver.globalUpperBound())-1.0;
-   if(m_lpSolver.objective() >= (cutOffBound +1e-8) ){
+   if(m_lpSolver.objective() >= (cutOffBound +1e-8) ){//TODO: fix epsilon
       return;
    }
    const auto& focusGraph = m_focusGraph;
@@ -461,19 +458,38 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
    DenseSet uncoloredNodes(focusGraph.numNodes(),true);
 
    std::vector<std::size_t> color_indices;
+   auto projectedSolCopy = projectedSolution;
    while(!uncoloredNodes.empty()){
       auto best = std::max_element(projectedSolution.begin(),projectedSolution.end(),[&](const PartialSolVar& a, const PartialSolVar& b){
-         return a.value*(a.projectedSet.intersection(uncoloredNodes)).size() < b.value*(b.projectedSet.intersection(uncoloredNodes)).size();
+         return a.value*a.projectedSet.size() < b.value*b.projectedSet.size();
       });
       uncoloredNodes.inplaceDifference(best->projectedSet);
       color_indices.push_back(best->index);
       if(color_indices.size() > LPsol.size()){
          break;
       }
+      DenseSet removeSet = best->projectedSet;
+      for(auto& projectedVar : projectedSolution){
+         projectedVar.projectedSet.inplaceDifference(removeSet);
+      }
    }
    if(uncoloredNodes.empty() && color_indices.size() < t_solver.globalUpperBound()){
-      //TODO: add setting for storing 'only best' solutions or also suboptimal settings
-      t_solver.addSolution(color_indices); //TODO: create solution pool
+      //project solution back to original graph; although the sets form a coloring for this graph after branching, we also want to solution
+      //to be valid in the root node.
+      DenseSet originalUncolored(m_completeFocusGraph.numNodes(),true);
+      for(const auto& index : color_indices){
+         originalUncolored.inplaceDifference(variables[index].set());
+      }
+      if(originalUncolored.empty()){
+         //no need to repair
+         t_solver.addSolution(color_indices);
+      }else{
+         // Need to repair the solution.
+         // In this case we need to add columns which are also valid in the current subproblem
+         std::cout<<"Coloring not found"<<std::endl;
+         //TODO: repair whilst adding as few new columns as possible
+         //how to do this; repair one at a time?
+      };
    }
 
 }

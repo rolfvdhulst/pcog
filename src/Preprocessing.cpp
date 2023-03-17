@@ -26,7 +26,7 @@ DenseSet findInitialClique(const DenseGraph& t_graph){
    mss.setUserData(&data);
    mss.setCallback(mss_callback);
    mss.setInfiniteUpperBound();
-   mss.setNodeLimit(50'000);
+   mss.setNodeLimit(t_graph.numNodes()*10);
 
    mss.run();
 

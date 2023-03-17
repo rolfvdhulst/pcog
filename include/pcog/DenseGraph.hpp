@@ -28,6 +28,12 @@ class DenseGraph {
    /// \param b Second edge node
    void addEdge(Node a, Node b);
 
+   /// Adds edges from a given node to a set of other nodes.
+   /// Edges which already exist are kept
+   /// \param a Node to add edges to
+   /// \param b Other nodes to connect with
+   void addEdges(Node a, const DenseSet& other_nodes);
+
    /// Removes an edge between node a and node b. If the edge was already
    /// removed, nothing happens
    /// \param a First edge node

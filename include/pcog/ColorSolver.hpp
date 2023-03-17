@@ -9,6 +9,8 @@
 #include "ColorNodeWorker.hpp"
 #include "DenseGraph.hpp"
 #include "Preprocessing.hpp"
+#include "Settings.hpp"
+#include <chrono>
 
 namespace pcog {
 
@@ -81,8 +83,22 @@ class ColorSolver {
       m_colorings.push_back(t_color_indices);
    }
    [[nodiscard]] std::size_t globalUpperBound() const {return m_upperBound;}
+
+   void printStatistics(std::ostream& t_ostream) const;
  private:
+   SolverStatus presolve();
+   void branchAndBound();
    void setStatus(SolverStatus t_status);
+   void recordStatistics();
+   void cleanStatistics();
+   bool checkTimelimitHit() const{
+      if(settings.timeLimit() != NO_TIME_LIMIT){
+         auto time = std::chrono::high_resolution_clock::now();
+         std::chrono::duration<double> duration(m_start_solve_time-time);
+         return duration.count() >= settings.timeLimit();
+      }
+      return false;
+   }
    SolverStatus m_status = SolverStatus::NO_PROBLEM;
    ColorNodeWorker m_worker;
 
@@ -101,7 +117,15 @@ class ColorSolver {
    std::size_t m_upperBound;
    BBTree m_tree;
 
-   //TODO: statistics (LP its, nodes,
+   //settings (TODO implement checks)
+   Settings settings;
+
+   //statistics
+   std::chrono::high_resolution_clock::time_point m_start_solve_time;
+   double m_presolve_time;
+   double m_branch_and_bound_time;
+   double m_total_solve_time;
+   std::size_t m_num_processed_nodes;
 };
 } // namespace pcog
 #endif // PCOG_SRC_COLORSOLVER_HPP

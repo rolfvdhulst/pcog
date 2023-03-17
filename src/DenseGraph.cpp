@@ -161,4 +161,10 @@ degree_type DenseGraph::nodeDegree(Node t_node) const {
 void DenseGraph::clear() {
    m_adjacencyMatrix.clear();
 }
+void DenseGraph::addEdges(Node node, const DenseSet &other_nodes) {
+   m_adjacencyMatrix[node].inplaceUnion(other_nodes);
+   for(const auto& other_node : other_nodes){
+      m_adjacencyMatrix[other_node].add(node);
+   }
+}
 } // namespace pcog

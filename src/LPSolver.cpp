@@ -99,7 +99,9 @@ RowVector LPSolver::getPrimalSolution() {
 
    RowVector colVector; //TODO reserve/allocate space
    for (int i = 0; i < spxVector.dim(); ++i) {
-      colVector.emplace_back(i,spxVector[i]);
+      if(spxVector[i] != 0.0){ // 'soft' checking for 0.0 because we let users of this function decide what to do with very small numerical values
+         colVector.emplace_back(i,spxVector[i]);
+      }
    }
    return colVector;
 }
