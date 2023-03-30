@@ -97,6 +97,12 @@ class BBTree {
 
    BBNode &popNextNode();
 
+   /**
+    * Remove branch-and-bound nodes whoms
+    * lower bound is greater or equal to the newly found upper bound
+    * @param numColors
+    */
+   void pruneUpperBound(std::size_t numColors);
    void createChildren(node_id t_node, ColorNodeWorker& t_nodeWorker);
 
    [[nodiscard]] std::size_t numOpenNodes() const;

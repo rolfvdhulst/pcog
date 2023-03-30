@@ -64,6 +64,8 @@ class LPSolver {
    /// \return true if solved successfully, false if some error occurred.
    bool solve();
 
+   void changeBounds(ColIdx col, double lb, double ub);
+   void setObjectiveUpperLimit(double limit);
    //Following functions are unfortunately not const because of SoPlex
    /// Gets the dual solution vector of the solved LP
    /// \return

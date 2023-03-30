@@ -39,6 +39,7 @@ class ColorNodeWorker {
    void farkasPricing(BBNode& node, ColorSolver& t_solver);
    void pricingLoop(BBNode& node, ColorSolver& t_solver);
    void roundingHeuristic(BBNode& node, ColorSolver& t_solver);
+   void divingHeuristic(BBNode& t_node, ColorSolver& t_solver);
 
    PricingResult priceColumn(BBNode& node, ColorSolver& t_solver);
    void solutionCallback(const DenseSet &current_nodes, SafeWeight weight,
@@ -49,7 +50,9 @@ class ColorNodeWorker {
    void fixLPBasis(LPBasis& basis, const NodeMap& previous_nodemap);
 
    void maximizeStableSet(DenseSet& set, const DenseGraph& graph);
-   void addColumns(const std::vector<DenseSet>& set, ColorSolver& t_solver);
+   void addColumns(const std::vector<DenseSet>& sets, ColorSolver& t_solver);
+   void addColumnsToLP(const std::vector<DenseSet>& sets, ColorSolver& t_solver);
+   std::vector<std::size_t> repairColoring(const std::vector<DenseSet>& coloring, ColorSolver& t_solver);
    LPSolver m_lpSolver;
    std::unique_ptr<MaxWeightStableSetCombinatorial<SafeDualWeights>> m_mwssSolver;
    const ColorSolver * m_colorSolver;

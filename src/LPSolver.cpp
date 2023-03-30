@@ -149,5 +149,11 @@ void LPSolver::addColumns(const std::vector<ColVector> &t_columnElements,
    }
    m_soplex.addColsReal(colSet);
 }
+void LPSolver::setObjectiveUpperLimit(double limit) {
+   m_soplex.setRealParam(soplex::SoPlexBase<double>::OBJLIMIT_UPPER ,limit);
+}
+void LPSolver::changeBounds(ColIdx col, double lb, double ub) {
+   m_soplex.changeBoundsReal(col,lb,ub);
+}
 
 } // namespace pcog

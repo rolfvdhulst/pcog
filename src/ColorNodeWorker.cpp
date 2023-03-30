@@ -32,6 +32,7 @@ void ColorNodeWorker::processNode(BBNode &t_node, ColorSolver &t_solver) {
    // Price-lp loop
    pricingLoop(t_node, t_solver);
    computeBranchingVertices(t_node, t_solver);
+   divingHeuristic(t_node,t_solver);
 }
 void ColorNodeWorker::setupGraphs(BBNode &node, const ColorSolver &solver) {
 
@@ -263,23 +264,7 @@ void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
       assert(set.capacity() == m_completeFocusGraph.numNodes());
       t_solver.addStableSet(set);
    }
-   // Add the columns to the LP
-   const NodeMap& mapToFocussed = m_mapToPreprocessed.oldToNewIDs;
-   for (const auto &set : sets) {
-      ColVector colRows;
-      for (const Node elem : set) {
-         Node node = mapToFocussed[elem];
-         if(node != INVALID_NODE){
-            assert(node < m_lpSolver.numRows());
-            colRows.emplace_back(node, 1.0);
-         }
-      }
-      // TODO: add all columns at once in soplex (more efficient)
-      m_lpSolver.addColumn(
-          colRows, 1.0, 0.0,
-          soplex::infinity); // TODO: infinity/weak upper bound here
-   }
-   assert(t_solver.variables().size() == m_lpSolver.numCols());
+   addColumnsToLP(sets,t_solver);
 }
 PricingResult ColorNodeWorker::priceColumn(BBNode &node,
                                            ColorSolver &t_solver) {
@@ -457,14 +442,14 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
    }
    DenseSet uncoloredNodes(focusGraph.numNodes(),true);
 
-   std::vector<std::size_t> color_indices;
+   std::vector<std::vector<PartialSolVar>::const_iterator> color_indices;
    auto projectedSolCopy = projectedSolution;
    while(!uncoloredNodes.empty()){
       auto best = std::max_element(projectedSolution.begin(),projectedSolution.end(),[&](const PartialSolVar& a, const PartialSolVar& b){
          return a.value*a.projectedSet.size() < b.value*b.projectedSet.size();
       });
       uncoloredNodes.inplaceDifference(best->projectedSet);
-      color_indices.push_back(best->index);
+      color_indices.emplace_back(best);
       if(color_indices.size() > LPsol.size()){
          break;
       }
@@ -477,17 +462,40 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
       //project solution back to original graph; although the sets form a coloring for this graph after branching, we also want to solution
       //to be valid in the root node.
       DenseSet originalUncolored(m_completeFocusGraph.numNodes(),true);
-      for(const auto& index : color_indices){
-         originalUncolored.inplaceDifference(variables[index].set());
+      for(const auto& var : color_indices){
+         originalUncolored.inplaceDifference(variables[var->index].set());
       }
       if(originalUncolored.empty()){
          //no need to repair
-         t_solver.addSolution(color_indices);
+         std::vector<std::size_t> indices;
+         for(const auto& elem : color_indices){
+            indices.emplace_back(elem->index);
+         }
+         t_solver.addSolution(indices);
       }else{
          // Need to repair the solution.
-         // In this case we need to add columns which are also valid in the current subproblem
-         std::cout<<"Coloring not found"<<std::endl;
-         //TODO: repair whilst adding as few new columns as possible
+         // In this case we need to add columns which are also valid in the current node
+         // TODO: somehow try minimizing the # of added columns
+         SetColoring setColoring;
+         for(const auto& var : color_indices){
+
+            long index = std::distance(projectedSolution.cbegin(),var);
+            setColoring.addColor(projectedSolCopy[index].projectedSet);
+         }
+         NodeColoring coloring(m_focusGraph.numNodes(),setColoring);
+         NodeColoring newColoring = extendColoring(coloring,m_mapToPreprocessed,m_completeFocusGraph);
+
+         SetColoring fixedColoring(newColoring);
+         std::size_t before = t_solver.variables().size();
+         std::vector<DenseSet> colors = fixedColoring.colors();
+         for(auto& color : colors){
+            maximizeStableSet(color,m_completeFocusGraph);
+         }
+         auto indices = repairColoring(colors,t_solver);
+         t_solver.addSolution(indices);
+         std::size_t after = t_solver.variables().size();
+
+         std::cout<<fixedColoring.numColors()<<"-coloring repaired, " <<after -before <<" new stable sets\n";
          //how to do this; repair one at a time?
       };
    }
@@ -527,6 +535,132 @@ void ColorNodeWorker::fixLPBasis(LPBasis &basis,
    }
 
    assert(basis.rowStatus.size() == m_lpSolver.numRows() && basis.colStatus.size() == m_lpSolver.numCols());
+
+}
+std::vector<std::size_t>
+ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring,
+                                ColorSolver &t_solver) {
+   assert(t_solver.variables().size() == m_lpSolver.numCols());
+
+   std::size_t oldIndex = t_solver.variables().size();
+   std::vector<std::size_t> colorIndices;
+   std::vector<DenseSet> toAddSets;
+   // First add the columns to our internal storage
+   for (const auto &set : coloring) {
+      std::size_t index = t_solver.findOrAddStableSet(set);
+      colorIndices.push_back(index);
+      if(index >= oldIndex){
+         toAddSets.push_back(set);
+      }
+   }
+   addColumnsToLP(toAddSets,t_solver);
+   m_lpSolver.solve();
+   return colorIndices;
+}
+void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
+                                     ColorSolver &t_solver) {
+   // Add the columns to the LP
+   const NodeMap& mapToFocussed = m_mapToPreprocessed.oldToNewIDs;
+   for (const auto &set : sets) {
+      ColVector colRows;
+      for (const Node elem : set) {
+         Node node = mapToFocussed[elem];
+         if(node != INVALID_NODE){
+            assert(node < m_lpSolver.numRows());
+            colRows.emplace_back(node, 1.0);
+         }
+      }
+      // TODO: add all columns at once in soplex (more efficient)
+      m_lpSolver.addColumn(
+          colRows, 1.0, 0.0,
+          soplex::infinity); // TODO: infinity/weak upper bound here
+   }
+   assert(t_solver.variables().size() == m_lpSolver.numCols());
+}
+void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
+   //do not dive if we cannot find an incumbent anyways
+   //TODO: remove the -1 in case we also price, as pricing may still lower the bound; but check after pricing cycle is complete!
+   double cutoffLimit = t_solver.globalUpperBound()-1.0 + 1e-6; //TODO: numerical tolerance limit
+   if(m_lpSolver.objective() > cutoffLimit || t_node.depth() >= 8){
+      return;
+   }
+   m_lpSolver.setObjectiveUpperLimit(cutoffLimit);
+
+   std::vector<ColIdx> fixedUpperBoundVars;
+   double alpha = 1.0; //parameter for weighing importance of LP solution
+   double beta = 2.0; //parameter for weighing importance of columns
+   DenseSet coveredNodes(m_focusGraph.numNodes());
+   DenseSet varSet(m_focusGraph.numNodes());
+   const auto& vars = t_solver.variables();
+
+   bool solution_found = false;
+   while(true){
+      auto sol = m_lpSolver.getPrimalSolution();
+      auto best_it = sol.end();
+      double best_score = - std::numeric_limits<double>::infinity();
+      for(auto it = sol.begin(); it != sol.end(); ++it){
+         if(it->value == 0.0 || it->value == 1.0){ //TODO: fix numerical tolerances here
+            continue;
+         }
+         varSet.clear();
+         m_mapToPreprocessed.oldToNewIDs.transform(vars[it->column].set(),varSet);
+         //extra term to ensure that values close to zero favor the sets which cover more nodes
+         double score = (std::pow(it->value,alpha)+1e-6)* std::pow(varSet.difference(coveredNodes).size(),beta);
+         if(score > best_score){
+            best_score = score;
+            best_it = it;
+         }
+      }
+      if(best_it == sol.end()){
+         //no fractional points: we think we found an integral solution
+         solution_found = true;
+         break;
+      }
+
+      //Fix the variable from best_it to 1
+      varSet.clear();
+      m_mapToPreprocessed.oldToNewIDs.transform(vars[best_it->column].set(),varSet);
+      coveredNodes.inplaceUnion(varSet);
+
+      m_lpSolver.changeBounds(best_it->column,1.0,soplex::infinity); //TODO: test setting upper bounds?
+      fixedUpperBoundVars.push_back(best_it->column);
+      //resolve the LP
+      bool status = m_lpSolver.solve();
+      if(!status){ //exits when the LP solver has an error or the objective is cut off
+         break;
+      }
+   }
+   if(solution_found){
+      std::vector<std::size_t> indices;
+      auto solution = m_lpSolver.getPrimalSolution();
+      for(const auto& elem : solution){
+         assert(elem.value == 0.0 || elem.value == 1.0); //TODO: numerical tolerance
+         if(elem.value == 1.0){
+            indices.push_back(elem.column);
+         }
+      }
+
+      DenseSet originalUncolored(m_completeFocusGraph.numNodes(),true);
+      const auto& variables = t_solver.variables();
+      for(const auto& index : indices){
+         originalUncolored.inplaceDifference(variables[index].set());
+      }
+      if(originalUncolored.empty()) {
+         // no need to repair
+         t_solver.addSolution(indices);
+      }else{
+         std::cout<<"Could not repair diving solution : "<<m_lpSolver.objective()<<"\n";
+      }
+   }
+
+
+   //TODO: also set LP integrality information for soplex when diving, and possibly 'polish' the LP basis
+   //reset the LP to where it was; remove cutoff bound and reset upper bounds which were fixed to zero
+   for(const auto& index : fixedUpperBoundVars){
+      m_lpSolver.changeBounds(index,0.0,soplex::infinity);
+   }
+   m_lpSolver.setObjectiveUpperLimit(soplex::infinity);
+   //TODO: ensure basis is saved somewhere sensible for branching; now we destroy the basis information
 
 }
 
