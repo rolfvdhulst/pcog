@@ -108,7 +108,7 @@ void ColorSolver::branchAndBound() {
       }
       ++m_num_processed_nodes;
 
-      if (m_num_processed_nodes == settings.nodeLimit() ||
+      if (m_num_processed_nodes == m_settings.nodeLimit() ||
           checkTimelimitHit()) {
          break;
       }

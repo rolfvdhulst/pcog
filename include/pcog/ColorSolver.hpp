@@ -64,6 +64,9 @@ class ColorSolver {
    [[nodiscard]] std::size_t globalUpperBound() const {return m_upperBound;}
 
    void printStatistics(std::ostream& t_ostream) const;
+
+   Settings& settings() { return m_settings;}
+   const Settings& settings() const {return m_settings;}
  private:
    SolverStatus presolve();
    void branchAndBound();
@@ -71,12 +74,12 @@ class ColorSolver {
    void recordStatistics();
    void cleanStatistics();
    bool checkTimelimitHit() const{
-      if(settings.timeLimit() != NO_TIME_LIMIT){
-         auto time = std::chrono::high_resolution_clock::now();
-         std::chrono::duration<double> duration(m_start_solve_time-time);
-         return duration.count() >= settings.timeLimit();
+      if(m_settings.timeLimit() == NO_TIME_LIMIT){
+         return false;
       }
-      return false;
+      auto time = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> duration(m_start_solve_time-time);
+      return duration.count() >= m_settings.timeLimit();
    }
    SolverStatus m_status = SolverStatus::NO_PROBLEM;
    ColorNodeWorker m_worker;
@@ -97,7 +100,7 @@ class ColorSolver {
    BBTree m_tree;
 
    //settings (TODO implement checks)
-   Settings settings;
+   Settings m_settings;
 
    //statistics
    std::chrono::high_resolution_clock::time_point m_start_solve_time;

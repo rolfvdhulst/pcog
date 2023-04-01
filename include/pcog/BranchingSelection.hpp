@@ -7,34 +7,11 @@
 
 #include "ColorSolver.hpp"
 #include "DenseGraph.hpp"
-
+#include "Settings.hpp"
 #include <iostream>
 
 namespace pcog {
-enum class BranchingStrategy : int {
-   INTERSECTION_SIZE = 0,
-   UNION_SIZE = 1,
-   INTERSECTION_UNION_SIZE = 2,
-   SYMMETRIC_DIFFERENCE_SIZE = 3,
-   TRIANGLES_ADDED = 4,
-   TRIANGLES_ADDED_SCALED = 5,
-   HELDS_RULE = 6,
-   RANDOMLY = 7,
-   DUAL_MAX = 8,
-   DUAL_MIN = 9,
-   FRACTIONAL = 10,
-   REMOVAL_SIZE = 11,
-   MIN_REMOVAL_SIZE = 12,
-   MAXIMUM_STRATEGY = 12 // Update this correctly when ever adding values to this enum
-};
 
-enum class SelectionStrategy {
-   VIOLATED_IN_BOTH = 0,
-   VIOLATED_IN_SAME = 1,
-   VIOLATED_IN_DIFFER = 2,
-   VIOLATED_IN_ONE = 3,
-   FIRST = 4
-};
 
 struct ScoredEdge {
    ScoredEdge() : node1{INVALID_NODE}, node2{INVALID_NODE}, score{0.0} {};
@@ -49,7 +26,7 @@ struct ScoredEdge {
 
 std::vector<ScoredEdge>::const_iterator
 selectBestPair(const std::vector<ScoredEdge> &t_sortedPairs,
-               SelectionStrategy t_selectionStrategy, const RowVector &lp_sol,
+               CandidateSelectionStrategy t_selectionStrategy, const RowVector &lp_sol,
                const NodeMap &focusToPreprocessed,
                const std::vector<StableSetVariable> &stable_sets);
 std::size_t countSameAddedTriangles(Node node1, Node node2,

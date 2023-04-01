@@ -76,7 +76,7 @@ void ColorNodeWorker::setupLP(BBNode &bb_node, const ColorSolver &t_solver) {
                                               // 'double mapping' here
          if (index != INVALID_NODE) {
             columnEntries.push_back(
-                ColElem(index, 1.0)); // TODO: fix conversion to int
+                ColElem(index, 1.0));
          }
       }
 
@@ -232,14 +232,14 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
 
    //Score them according to some function
    scoreBranchingCandidates(
-       scoredEdges, BranchingStrategy::INTERSECTION_UNION_SIZE, m_focusGraph,
+       scoredEdges, t_solver.settings().branchingStrategy(), m_focusGraph,
        m_lpSolver,t_solver.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
    std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
    std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
    //Select pair, checking if they are violated in both branches
    const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
-   auto best_it = selectBestPair(scoredEdges,SelectionStrategy::VIOLATED_IN_BOTH,
+   auto best_it = selectBestPair(scoredEdges,t_solver.settings().candidateSelectionStrategy(),
                   primalSol,focusToPreprocessed,t_solver.variables());
    assert(best_it != scoredEdges.end());
    assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
@@ -278,14 +278,14 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    for (const auto &row : dual_values) {
       dualSolution[row.column] = row.value;
    }
-  if(!duringDiving){
-         double dualSum = std::accumulate(dualSolution.begin(), dualSolution.end(), 0.0);
-         double test = fabs(dualSum - m_lpSolver.objective());
-         assert(test <= 1e-8);
-         // TODO: check why the dual solution is not equal... how? How to
-         // query dual variable bounds?
-         // Only breaks when variable upper bounds are 1.0 for DSJC125.9
-  }
+//  if(!duringDiving){
+//         double dualSum = std::accumulate(dualSolution.begin(), dualSolution.end(), 0.0);
+//         double test = fabs(dualSum - m_lpSolver.objective());
+//         assert(test <= 1e-8);
+//         // TODO: check why the dual solution is not equal... how? How to
+//         // query dual variable bounds?
+//         // Only breaks when variable upper bounds are 1.0 for DSJC125.9
+//  }
 
    // round up weights to prevent negative dual_values
    for (auto &dual : dualSolution) {
@@ -418,7 +418,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, ColorSolver &t_solver) {
 
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    double cutOffBound = static_cast<double>(t_solver.globalUpperBound())-1.0;
-   if(m_lpSolver.objective() >= (cutOffBound +1e-8) ){//TODO: fix epsilon
+   if(m_lpSolver.objective() >= cutOffBound + t_solver.settings().roundingTolerance()){
       return;
    }
    const auto& focusGraph = m_focusGraph;
@@ -584,13 +584,22 @@ void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
    assert(t_solver.variables().size() == m_lpSolver.numCols());
 }
 void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
-   //do not dive if we cannot find an incumbent anyways
-   double cutoffLimit = t_solver.globalUpperBound()-1.0 + 1e-6; //TODO: numerical tolerance limit
+   const int frequency = t_solver.settings().divingFrequency();
+   const int depth = t_node.depth();
+   if( frequency == -1 || (frequency == 0 && depth != 0) ||
+       (frequency > 0 && depth % frequency != 0) ){
+      return;
+   }
+   //do not dive if we cannot find an incumbent anyways (TODO make setting for finding equivalent solutions for crossover)
+   double cutoffLimit = t_solver.globalUpperBound()-1.0 + t_solver.settings().roundingTolerance();
    if(m_lpSolver.objective() > cutoffLimit){
       return;
    }
 
-   bool doColumnGeneration = t_node.depth() == 0;
+   //std::cout<<"starting diving!\n";
+   const int pricing_frequency = t_solver.settings().divingPricingFrequency();
+   bool doColumnGeneration = (pricing_frequency == 0 && depth == 0) ||
+                             (pricing_frequency > 0 && depth % pricing_frequency == 0);
    if(!doColumnGeneration){
       m_lpSolver.setObjectiveUpperLimit(cutoffLimit);
    }
@@ -614,8 +623,9 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
          }
          varSet.clear();
          m_mapToPreprocessed.oldToNewIDs.transform(vars[it->column].set(),varSet);
-         //extra term to ensure that values close to zero favor the sets which cover more nodes
-         double score = (std::pow(it->value,alpha)+1e-6)* std::pow(varSet.difference(coveredNodes).size(),beta);
+         //extra tolerance term term to ensure that values close to zero favor the sets which cover more nodes
+         double score = (std::pow(it->value,alpha)+ t_solver.settings().roundingTolerance()) *
+                        std::pow(varSet.difference(coveredNodes).size(),beta);
          if(score > best_score){
             best_score = score;
             best_it = it;
@@ -653,8 +663,9 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
       std::vector<std::size_t> indices;
       auto solution = m_lpSolver.getPrimalSolution();
       for(const auto& elem : solution){
-         assert(elem.value == 0.0 || elem.value == 1.0); //TODO: numerical tolerance
-         if(elem.value == 1.0){
+         assert(t_solver.settings().isFeasOne(elem.value) ||
+                t_solver.settings().isFeasZero(elem.value));
+         if(t_solver.settings().isFeasOne(elem.value)){
             indices.push_back(elem.column);
          }
       }

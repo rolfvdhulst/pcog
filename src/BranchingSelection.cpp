@@ -320,13 +320,13 @@ std::vector<ScoredEdge> getAllBranchingEdgesViolatedInBoth(
 
 std::vector<ScoredEdge>::const_iterator
 selectBestPair(const std::vector<ScoredEdge> &t_sortedPairs,
-               SelectionStrategy t_selectionStrategy, const RowVector &solution,
+               CandidateSelectionStrategy t_selectionStrategy, const RowVector &solution,
                const NodeMap &focusToPreprocessed,
                const std::vector<StableSetVariable> &stable_sets) {
    auto best_pair = t_sortedPairs.end();
 
    switch (t_selectionStrategy) {
-   case SelectionStrategy::VIOLATED_IN_BOTH: {
+   case CandidateSelectionStrategy::VIOLATED_IN_BOTH: {
       for (auto pair_it = t_sortedPairs.begin(); pair_it != t_sortedPairs.end();
            ++pair_it) {
          for (std::size_t i = 1; i < solution.size(); ++i) { //TODO: limit LP solution to only fractional variables
@@ -353,11 +353,11 @@ selectBestPair(const std::vector<ScoredEdge> &t_sortedPairs,
          }
       }
    } break;
-   case SelectionStrategy::VIOLATED_IN_SAME: // TODO fix
-   case SelectionStrategy::VIOLATED_IN_DIFFER:
-   case SelectionStrategy::VIOLATED_IN_ONE:
+   case CandidateSelectionStrategy::VIOLATED_IN_SAME: // TODO fix
+   case CandidateSelectionStrategy::VIOLATED_IN_DIFFER:
+   case CandidateSelectionStrategy::VIOLATED_IN_ONE:
       break;
-   case SelectionStrategy::FIRST:
+   case CandidateSelectionStrategy::FIRST:
       break;
    }
    if (best_pair == t_sortedPairs.end()) {
