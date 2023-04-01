@@ -74,21 +74,23 @@ bool LPSolver::solve() {
 }
 RowVector LPSolver::getDualSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
-   DVector spxVector(m_soplex.numRows()); //TODO: how do we know how much space to allocate?
+   DVector spxVector(m_soplex.numRows());
    bool result = m_soplex.getDual(spxVector); //TODO: error handling
    assert(result);
-   RowVector rowVector; //TODO reserve/allocate space
+   RowVector rowVector(spxVector.dim());
    for (int i = 0; i < spxVector.dim(); ++i) {
-      rowVector.emplace_back(i,spxVector[i]);
+      rowVector[i].column = i;
+      rowVector[i].value = spxVector[i];
    }
    return rowVector;
 }
 RowVector LPSolver::columnUpperBounds() {
    DVector spxVector(m_soplex.numCols());
    m_soplex.getUpperReal(spxVector); //TODO: error handling
-   RowVector vector; //TODO reserve/allocate space
+   RowVector vector(spxVector.dim());
    for (int i = 0; i < spxVector.dim(); ++i) {
-      vector.emplace_back(i,spxVector[i]);
+      vector[i].column = i;
+      vector[i].value = spxVector[i];
    }
    return vector;
 }
@@ -97,7 +99,7 @@ RowVector LPSolver::getPrimalSolution() {
    DVector spxVector(m_soplex.numCols());
    m_soplex.getPrimal(spxVector);
 
-   RowVector colVector; //TODO reserve/allocate space
+   RowVector colVector;
    for (int i = 0; i < spxVector.dim(); ++i) {
       if(spxVector[i] != 0.0){ // 'soft' checking for 0.0 because we let users of this function decide what to do with very small numerical values
          colVector.emplace_back(i,spxVector[i]);
