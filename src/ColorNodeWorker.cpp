@@ -30,7 +30,7 @@ void ColorNodeWorker::processNode(BBNode &t_node, ColorSolver &t_solver) {
    }
 
    // Price-lp loop
-   pricingLoop(t_node, t_solver);
+   pricingLoop(t_node, t_solver,false);
    computeBranchingVertices(t_node, t_solver);
    divingHeuristic(t_node,t_solver);
 }
@@ -193,7 +193,7 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node, ColorSolver &t_solver) {
    addColumns(pricedSets, t_solver);
    m_lpSolver.solve();
 }
-void ColorNodeWorker::pricingLoop(BBNode &node, ColorSolver &t_solver) {
+void ColorNodeWorker::pricingLoop(BBNode &node, ColorSolver &t_solver, bool duringDiving) {
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    while (true) {
       // Run rounding heuristics / integrality check on the current LP solution
@@ -201,7 +201,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, ColorSolver &t_solver) {
       // Solve pricing problem. If new columns can be found, add them and
       // resolve the LP. Otherwise, break away from loop as we have optimally
       // solved this node, and the lower bounds are updated.
-      auto result = priceColumn(node, t_solver);
+      auto result = priceColumn(node, t_solver,duringDiving);
       if (result != PricingResult::FOUND_COLUMN) {
          // TODO: also account for other sources of pricing stopping, such as
          // time limits being hit.
@@ -267,7 +267,8 @@ void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
    addColumnsToLP(sets,t_solver);
 }
 PricingResult ColorNodeWorker::priceColumn(BBNode &node,
-                                           ColorSolver &t_solver) {
+                                           ColorSolver &t_solver,
+                                           bool duringDiving) {
 
    // Get dual weights and make them numerically safe
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
@@ -277,14 +278,15 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    for (const auto &row : dual_values) {
       dualSolution[row.column] = row.value;
    }
-   double dualSum =
-       std::accumulate(dualSolution.begin(), dualSolution.end(), 0.0);
-   double test = fabs(dualSum - m_lpSolver.objective());
-   assert(
-       test <=
-       1e-8); // TODO: check why the dual solution is not equal... how? How to
-              // query dual variable bounds?
-              //  Only breaks when variable upper bounds are 1.0 for DSJC125.9
+  if(!duringDiving){
+         double dualSum = std::accumulate(dualSolution.begin(), dualSolution.end(), 0.0);
+         double test = fabs(dualSum - m_lpSolver.objective());
+         assert(test <= 1e-8);
+         // TODO: check why the dual solution is not equal... how? How to
+         // query dual variable bounds?
+         // Only breaks when variable upper bounds are 1.0 for DSJC125.9
+  }
+
    // round up weights to prevent negative dual_values
    for (auto &dual : dualSolution) {
       dual = std::max(dual, 0.0);
@@ -352,28 +354,32 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    if (solvedOptimally) {
       if (newSets.empty()) {
 
-         SafeDualWeights::weight_type weightSum = dualWeights.fullCost();
-         RoundingMode mode = fegetround();
-         fesetround(FE_DOWNWARD);
-         double safeLowerBound = weightSum;
-         safeLowerBound /= dualWeights.scale();
-         fesetround(mode);
-         assert(m_lpSolver.objective() >= safeLowerBound);
-         node.updateLowerBound(safeLowerBound);
+         if(!duringDiving){
+            SafeDualWeights::weight_type weightSum = dualWeights.fullCost();
+            RoundingMode mode = fegetround();
+            fesetround(FE_DOWNWARD);
+            double safeLowerBound = weightSum;
+            safeLowerBound /= dualWeights.scale();
+            fesetround(mode);
+            assert(m_lpSolver.objective() >= safeLowerBound);
+            node.updateLowerBound(safeLowerBound);
+         }
          return PricingResult::NO_COLUMNS;
       }
    }
-   RoundingMode mode = fegetround();
-   fesetround(FE_UPWARD);
-   double pricingProblemUB =
-       static_cast<double>(bestPricingValue) / dualWeights.getOne();
-   assert(pricingProblemUB >= 1.0 - 1e-8); // TODO: make epsilon global?
-   fesetround(FE_DOWNWARD);
-   double derivedLowerBound = m_lpSolver.objective() / pricingProblemUB;
-   fesetround(mode);
-   assert(m_lpSolver.objective() >= derivedLowerBound);
+   if(!duringDiving){
+      RoundingMode mode = fegetround();
+      fesetround(FE_UPWARD);
+      double pricingProblemUB =
+          static_cast<double>(bestPricingValue) / dualWeights.getOne();
+      assert(pricingProblemUB >= 1.0 - 1e-8); // TODO: make epsilon global?
+      fesetround(FE_DOWNWARD);
+      double derivedLowerBound = m_lpSolver.objective() / pricingProblemUB;
+      fesetround(mode);
+      assert(m_lpSolver.objective() >= derivedLowerBound);
 
-   node.updateLowerBound(derivedLowerBound);
+      node.updateLowerBound(derivedLowerBound);
+   }
 
    addColumns(newSets, t_solver);
    return PricingResult::FOUND_COLUMN; // TODO: pick up on abort here
@@ -579,12 +585,15 @@ void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
 }
 void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
    //do not dive if we cannot find an incumbent anyways
-   //TODO: remove the -1 in case we also price, as pricing may still lower the bound; but check after pricing cycle is complete!
    double cutoffLimit = t_solver.globalUpperBound()-1.0 + 1e-6; //TODO: numerical tolerance limit
-   if(m_lpSolver.objective() > cutoffLimit || t_node.depth() >= 8){
+   if(m_lpSolver.objective() > cutoffLimit){
       return;
    }
-   m_lpSolver.setObjectiveUpperLimit(cutoffLimit);
+
+   bool doColumnGeneration = t_node.depth() == 0;
+   if(!doColumnGeneration){
+      m_lpSolver.setObjectiveUpperLimit(cutoffLimit);
+   }
 
    std::vector<ColIdx> fixedUpperBoundVars;
    double alpha = 1.0; //parameter for weighing importance of LP solution
@@ -595,6 +604,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
 
    bool solution_found = false;
    while(true){
+      //std::cout<<"Diving objective: "<<m_lpSolver.objective()<<"\n";
       auto sol = m_lpSolver.getPrimalSolution();
       auto best_it = sol.end();
       double best_score = - std::numeric_limits<double>::infinity();
@@ -629,6 +639,15 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
       if(!status){ //exits when the LP solver has an error or the objective is cut off
          break;
       }
+
+      if(doColumnGeneration){
+         //TODO: ensure that we do not waste time proving optimality when diving for pricing
+         pricingLoop(t_node,t_solver,true);
+         if(m_lpSolver.objective() >= cutoffLimit){
+            break;
+         }
+      }
+
    }
    if(solution_found){
       std::vector<std::size_t> indices;
@@ -659,7 +678,9 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, ColorSolver &t_solver) {
    for(const auto& index : fixedUpperBoundVars){
       m_lpSolver.changeBounds(index,0.0,soplex::infinity);
    }
-   m_lpSolver.setObjectiveUpperLimit(soplex::infinity);
+   if(!doColumnGeneration){
+      m_lpSolver.setObjectiveUpperLimit(soplex::infinity);
+   }
    //TODO: ensure basis is saved somewhere sensible for branching; now we destroy the basis information
 
 }

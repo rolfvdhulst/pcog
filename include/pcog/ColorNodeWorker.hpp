@@ -37,11 +37,11 @@ class ColorNodeWorker {
    void setupGraphs(BBNode& node, const ColorSolver& t_solver);
    void setupLP(BBNode& node, const ColorSolver& t_solver);
    void farkasPricing(BBNode& node, ColorSolver& t_solver);
-   void pricingLoop(BBNode& node, ColorSolver& t_solver);
+   void pricingLoop(BBNode& node, ColorSolver& t_solver, bool duringDiving);
    void roundingHeuristic(BBNode& node, ColorSolver& t_solver);
    void divingHeuristic(BBNode& t_node, ColorSolver& t_solver);
 
-   PricingResult priceColumn(BBNode& node, ColorSolver& t_solver);
+   PricingResult priceColumn(BBNode& node, ColorSolver& t_solver, bool duringDiving);
    void solutionCallback(const DenseSet &current_nodes, SafeWeight weight,
     void *user_data, bool first_solution, bool &stop_solving, bool &accepted_solution);
    /// Checks if the node is cut off. If not, then decides the branching vertices u and v
