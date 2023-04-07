@@ -43,9 +43,9 @@ SolverStatus ColorSolver::solve() {
    default: // TODO: ERROR and SOLVED_SUBOPTIMALLY; what to do with them
       break;
    }
-   m_start_solve_time = std::chrono::high_resolution_clock::now();
+   m_statistics.m_start_solve_time = std::chrono::high_resolution_clock::now();
    if (m_status == SolverStatus::PROBLEM_INITIALIZED) {
-      cleanStatistics();
+      m_statistics.reset();
       // First presolve the problem
       presolve();
       if (m_status == SolverStatus::ERROR ||
@@ -81,7 +81,7 @@ SolverStatus ColorSolver::presolve() {
 
    setStatus(SolverStatus::PRESOLVED);
    auto time_end = std::chrono::high_resolution_clock::now();
-   m_presolve_time =
+   m_statistics.m_presolve_time =
        std::chrono::duration<double>(time_end - time_start).count();
    return m_status;
 }
@@ -98,23 +98,20 @@ void ColorSolver::branchAndBound() {
                            *this); // TODO: ugly *this usage, use
                                    // intermediary struct to save data.
       // TODO: check for time limit in processNode
-      std::cout << "Processed node, lb: " << bb_node.fractionalLowerBound()
-                << " open nodes: " << m_tree.numOpenNodes()
-                << " total nodes: " << m_tree.numTotalNodes()
-                << " vars: " << m_variables.size() << std::endl;
 
       if (bb_node.status() == BBNodeStatus::BRANCHED) {
          m_tree.createChildren(bb_node.id(), m_worker);
       }
-      ++m_num_processed_nodes;
+      ++m_statistics.m_num_processed_nodes;
 
-      if (m_num_processed_nodes == m_settings.nodeLimit() ||
+      if (m_statistics.m_num_processed_nodes == m_settings.nodeLimit() ||
           checkTimelimitHit()) {
          break;
       }
+      m_statistics.display(std::cout);
    }
    auto time_end = std::chrono::high_resolution_clock::now();
-   m_branch_and_bound_time =
+   m_statistics.m_branch_and_bound_time =
        std::chrono::duration<double>(time_end - time_start).count();
    // TODO: be careful with termination from time limit in processNode before
    // branching when only one node is left
@@ -122,21 +119,14 @@ void ColorSolver::branchAndBound() {
                                     : SolverStatus::SOLVED_OPTIMALLY;
 }
 void ColorSolver::recordStatistics() {
-   auto end_time = std::chrono::high_resolution_clock::now();
-   m_total_solve_time =
-       std::chrono::duration<double>(end_time - m_start_solve_time).count();
+   m_statistics.m_total_solve_time = m_statistics.timeSinceStart();
 }
-void ColorSolver::cleanStatistics() {
-   m_presolve_time = 0.0;
-   m_branch_and_bound_time = 0.0;
-   m_total_solve_time = 0.0;
-   m_num_processed_nodes = 0;
-}
+
 void ColorSolver::printStatistics(std::ostream &t_out) const {
-   t_out << "Total time: " << m_total_solve_time << "\n";
-   t_out << "Presolve time: " << m_presolve_time << "\n";
-   t_out << "B&B time: " << m_branch_and_bound_time << "\n";
-   t_out << "B&B nodes: " << m_num_processed_nodes << "\n";
+   t_out << "Total time: " << m_statistics.m_total_solve_time << "\n";
+   t_out << "Presolve time: " << m_statistics.m_presolve_time << "\n";
+   t_out << "B&B time: " << m_statistics.m_branch_and_bound_time << "\n";
+   t_out << "B&B nodes: " << m_statistics.m_num_processed_nodes << "\n";
 }
 std::size_t ColorSolver::findOrAddStableSet(const DenseSet &set) {
    for(std::size_t i = 0; i < m_variables.size(); ++i){

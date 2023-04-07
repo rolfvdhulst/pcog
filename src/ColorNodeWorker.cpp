@@ -372,7 +372,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       fesetround(FE_UPWARD);
       double pricingProblemUB =
           static_cast<double>(bestPricingValue) / dualWeights.getOne();
-      assert(pricingProblemUB >= 1.0 - 1e-8); // TODO: make epsilon global?
+      assert(pricingProblemUB >= 1.0 - t_solver.settings().roundingTolerance());
       fesetround(FE_DOWNWARD);
       double derivedLowerBound = m_lpSolver.objective() / pricingProblemUB;
       fesetround(mode);

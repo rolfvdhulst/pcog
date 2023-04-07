@@ -10,6 +10,7 @@
 #include "DenseGraph.hpp"
 #include "Preprocessing.hpp"
 #include "Settings.hpp"
+#include "Statistics.hpp"
 #include <chrono>
 
 namespace pcog {
@@ -72,13 +73,12 @@ class ColorSolver {
    void branchAndBound();
    void setStatus(SolverStatus t_status);
    void recordStatistics();
-   void cleanStatistics();
    bool checkTimelimitHit() const{
       if(m_settings.timeLimit() == NO_TIME_LIMIT){
          return false;
       }
       auto time = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration(m_start_solve_time-time);
+      std::chrono::duration<double> duration(m_statistics.m_start_solve_time-time);
       return duration.count() >= m_settings.timeLimit();
    }
    SolverStatus m_status = SolverStatus::NO_PROBLEM;
@@ -103,11 +103,7 @@ class ColorSolver {
    Settings m_settings;
 
    //statistics
-   std::chrono::high_resolution_clock::time_point m_start_solve_time;
-   double m_presolve_time;
-   double m_branch_and_bound_time;
-   double m_total_solve_time;
-   std::size_t m_num_processed_nodes;
+   Statistics m_statistics;
 };
 } // namespace pcog
 #endif // PCOG_SRC_COLORSOLVER_HPP

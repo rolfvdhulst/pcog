@@ -90,6 +90,8 @@ set(sources
         include/pcog/SafeDualWeights.hpp
         src/BranchingSelection.cpp
         include/pcog/BranchingSelection.hpp
+        src/Statistics.cpp
+        include/pcog/Statistics.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
