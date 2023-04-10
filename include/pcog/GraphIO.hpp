@@ -7,7 +7,7 @@
 
 ///\file This file contains functions for writing and reading graphs
 
-#include "DenseGraph.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
 #include <fstream>
 #include <optional>
 #include <string>

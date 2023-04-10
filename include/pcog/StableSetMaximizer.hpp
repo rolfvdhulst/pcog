@@ -5,7 +5,7 @@
 #ifndef PCOG_INCLUDE_PCOG_STABLESETMAXIMIZER_HPP
 #define PCOG_INCLUDE_PCOG_STABLESETMAXIMIZER_HPP
 
-#include "DenseGraph.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
 #include <random>
 namespace pcog{
 class StableSetMaximizer {

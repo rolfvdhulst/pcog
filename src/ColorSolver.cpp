@@ -129,37 +129,9 @@ void ColorSolver::printStatistics(std::ostream &t_out) const {
    t_out << "B&B nodes: " << m_statistics.m_num_processed_nodes << "\n";
 }
 std::size_t ColorSolver::findOrAddStableSet(const DenseSet &set) {
-   for(std::size_t i = 0; i < m_variables.size(); ++i){
-      if(m_variables[i].set() == set){
-         return i;
-      }
-   }
-   std::size_t index = m_variables.size();
-   addStableSet(set);
-   return index;
+
 }
 void ColorSolver::addSolution(const std::vector<std::size_t> &t_color_indices) {
-#ifndef NDEBUG
-   {
-      // assert that coloring is indeed a valid coloring
-      DenseSet coveredNodes(m_preprocessedGraph.numNodes());
-      for (const auto &index : t_color_indices) {
-         assert(index < m_variables.size());
-         coveredNodes.inplaceUnion(m_variables[index].set());
-      }
-      assert(coveredNodes.full());
-   }
-#endif
 
-   std::size_t ub = t_color_indices.size();
-   if (ub < m_upperBound) {
-      // prune redundant nodes from the tree
-      m_tree.pruneUpperBound(ub);
-      // TODO: Additionally, update the LP cutoff limit for the current open workers
-      m_upperBound = ub;
-      m_incumbent_index = m_colorings.size();
-      std::cout << "New incumbent found with " << ub << "-coloring!\n";
-   }
-   m_colorings.push_back(t_color_indices);
 }
 } // namespace pcog

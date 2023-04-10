@@ -2,7 +2,7 @@
 // Created by rolf on 22-11-22.
 //
 
-#include "pcog/DenseSet.hpp"
+#include "pcog/utilities/DenseSet.hpp"
 #include <iostream>
 namespace pcog {
 degree_type DenseSet::size() const noexcept { return m_bitset.count(); }

@@ -2,7 +2,7 @@
 // Created by rolf on 26-11-22.
 //
 
-#include "pcog/DenseGraph.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
 
 namespace pcog {
 DenseGraph::DenseGraph(degree_type t_numNodes)

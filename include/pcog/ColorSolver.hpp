@@ -5,23 +5,14 @@
 #ifndef PCOG_SRC_COLORSOLVER_HPP
 #define PCOG_SRC_COLORSOLVER_HPP
 
-#include "BBNode.hpp"
 #include "ColorNodeWorker.hpp"
-#include "DenseGraph.hpp"
-#include "Preprocessing.hpp"
+#include "SolutionData.hpp"
 #include "Settings.hpp"
 #include "Statistics.hpp"
 #include <chrono>
 
 namespace pcog {
 
-class StableSetVariable{
- public:
-   StableSetVariable(DenseSet set) : m_set{set}{};
-   [[nodiscard]] const DenseSet& set() const { return m_set;}
- private:
-   DenseSet m_set;
-};
 
 enum class SolverStatus{
    NO_PROBLEM,
@@ -46,25 +37,6 @@ class ColorSolver {
 
    [[nodiscard]] const DenseGraph& preprocessedGraph() const {return m_preprocessedGraph;}
    [[nodiscard]] const std::vector<StableSetVariable>& variables() const {return m_variables;}
-   bool isNewSet(const DenseSet& set) const{
-      for(const auto& var : m_variables){
-         if(var.set() == set){
-            return false;
-         }
-      }
-      return true;
-   }
-   void addStableSet(const DenseSet& set){
-      assert(isNewSet(set));
-      assert(m_preprocessedGraph.setIsStable(set));
-      m_variables.emplace_back(set);
-   }
-   std::size_t findOrAddStableSet(const DenseSet& set);
-
-   void addSolution(const std::vector<std::size_t>& t_color_indices);
-   [[nodiscard]] std::size_t globalUpperBound() const {return m_upperBound;}
-
-   void printStatistics(std::ostream& t_ostream) const;
 
    Settings& settings() { return m_settings;}
    const Settings& settings() const {return m_settings;}
@@ -86,18 +58,7 @@ class ColorSolver {
 
    //Shared data, constant
    std::string m_problemName;
-   //Original Problem data
-   DenseGraph m_originalGraph;
-   //Problem after presolving.
-   DenseGraph m_preprocessedGraph;
-   PreprocessedMap m_preprocessedToOriginal;
 
-   //Shared solution data, not constant. The variables constraints and colorings are in terms of the preprocessed graph.
-   std::vector<StableSetVariable> m_variables;
-   std::vector<std::vector<std::size_t>> m_colorings;
-   std::size_t m_incumbent_index;
-   std::size_t m_upperBound;
-   BBTree m_tree;
 
    //settings (TODO implement checks)
    Settings m_settings;

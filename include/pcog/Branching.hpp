@@ -5,7 +5,7 @@
 #ifndef PCOG_SRC_BRANCHING_HPP
 #define PCOG_SRC_BRANCHING_HPP
 
-#include "DenseGraph.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
 #include "Preprocessing.hpp"
 namespace pcog {
 ///Represents the last type of branching applied to the node

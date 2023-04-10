@@ -38,7 +38,7 @@ class Settings {
                 m_time_limit{1e20},
                 m_absgap_limit{0},
                 m_relgap_limit{0.0},
-                m_branchingStrategy{BranchingStrategy::FRACTIONAL},
+                m_branchingStrategy{BranchingStrategy::INTERSECTION_UNION_SIZE},
                 m_branchCandidateSelectionStrategy{CandidateSelectionStrategy::VIOLATED_IN_BOTH},
                 m_rounding_tolerance{1e-8},
                 m_diving_frequency{1},

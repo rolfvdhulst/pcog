@@ -5,9 +5,9 @@
 #ifndef PCOG_SRC_PREPROCESSING_HPP
 #define PCOG_SRC_PREPROCESSING_HPP
 
-#include "pcog/DenseGraph.hpp"
-#include "pcog/NodeMap.hpp"
-#include "pcog/Coloring.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
+#include "pcog/utilities/NodeMap.hpp"
+#include "pcog/utilities/Coloring.hpp"
 
 namespace pcog {
 

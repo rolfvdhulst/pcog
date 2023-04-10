@@ -23,9 +23,9 @@
       "hidden": false,
       "inherits": ["dev"],
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wcast-align -Wold-style-cast -Wunused -Woverloaded-virtual -Wconversion -Wpedantic -Wmisleading-indentation -Wimplicit-fallthrough -Wformat=2 -Wdouble-promotion -Wnull-dereference -O3 -march=native",
-        "CMAKE_CXX_COMPILER": "/usr/bin/clang++-14",
-        "CMAKE_C_COMPILER": "/usr/bin/clang-14"
+        "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wcast-align -Wold-style-cast -Wunused -Woverloaded-virtual -Wconversion -Wpedantic -Wmisleading-indentation -Wimplicit-fallthrough -Wformat=2 -Wdouble-promotion -Wnull-dereference",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++-15",
+        "CMAKE_C_COMPILER": "/usr/bin/clang-15"
       }
     },
     {
@@ -35,8 +35,8 @@
       "inherits": ["dev"],
       "cacheVariables": {
         "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wcast-align -Wold-style-cast -Wunused -Woverloaded-virtual -Wconversion -Wpedantic -Wmisleading-indentation -Wimplicit-fallthrough -Wformat=2 -Wdouble-promotion -Wnull-dereference",
-        "CMAKE_CXX_COMPILER": "/usr/bin/g++-11",
-        "CMAKE_C_COMPILER": "/usr/bin/gcc-11"
+        "CMAKE_CXX_COMPILER": "/usr/bin/g++-12",
+        "CMAKE_C_COMPILER": "/usr/bin/gcc-12"
       }
     },
     {

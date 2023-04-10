@@ -2,8 +2,8 @@
 // Created by rolf on 23-11-22.
 //
 
-#include "pcog/NodeMap.hpp"
-#include "pcog/DenseSet.hpp"
+#include "pcog/utilities/NodeMap.hpp"
+#include "pcog/utilities/DenseSet.hpp"
 
 #include <cassert>
 #include <numeric>

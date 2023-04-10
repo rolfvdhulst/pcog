@@ -5,7 +5,7 @@
 #ifndef PCOG_INCLUDE_PCOG_SAFEDUALWEIGHTS_HPP
 #define PCOG_INCLUDE_PCOG_SAFEDUALWEIGHTS_HPP
 
-#include "Numerics.hpp"
+#include "pcog/utilities/Numerics.hpp"
 #include "mwss/WeightFunction.hpp"
 
 namespace pcog {

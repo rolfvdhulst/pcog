@@ -40,7 +40,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${test_sources})
 # tests target
 #----------------------------------------------------------------------------------------------------------------------
 
-add_executable(pcog-tests)
+add_executable(pcog-tests RbTreeTest.cpp)
 target_sources(pcog-tests PRIVATE ${test_sources})
 
 target_link_libraries(pcog-tests

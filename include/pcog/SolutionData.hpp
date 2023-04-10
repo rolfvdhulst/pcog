@@ -1,0 +1,74 @@
+//
+// Created by rolf on 7-4-23.
+//
+
+#ifndef PCOG_SOLUTIONDATA_HPP
+#define PCOG_SOLUTIONDATA_HPP
+
+#include <utility>
+
+#include "BBNode.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
+#include "pcog/utilities/DenseSet.hpp"
+#include "Preprocessing.hpp"
+
+namespace pcog {
+class StableSetVariable{
+ public:
+   explicit StableSetVariable(DenseSet set) : m_set{std::move(set)}{};
+   [[nodiscard]] const DenseSet& set() const { return m_set;}
+ private:
+   DenseSet m_set;
+};
+
+/// Class which holds the data produced during a solve of the graph.
+/// This data can have frequent reads and writes from multiple threads
+class SolutionData {
+ public:
+   explicit SolutionData(const DenseGraph& originalGraph);
+   /// This data is only changed during presolve, not during branch-and-bound
+   [[nodiscard]] const DenseGraph& originalGraph() const;
+   const DenseGraph& preprocessedGraph() const;
+   const PreprocessedMap& preprocessingMap() const;
+   const NodeMap& preprocessedToOriginal() const;
+   const NodeMap& originalToPreprocessed() const;
+
+   [[nodiscard]] bool isNewSet(const DenseSet& t_set) const;
+   std::size_t addStableSet(DenseSet t_set);
+   std::size_t findOrAddStableSet(const DenseSet& t_set);
+
+   void addSolution(std::vector<std::size_t> t_stable_set_indices);
+
+   [[nodiscard]] std::size_t upperBound() const;
+   [[nodiscard]] std::size_t lowerBound() const;
+   [[nodiscard]] double fractionalLowerBound() const;
+
+   std::size_t numProcessedNodes() const;
+   std::size_t numOpenNodes() const;
+ private:
+   // Original Problem data
+   const DenseGraph& m_originalGraph;
+   // Problem after presolving.
+   DenseGraph m_preprocessedGraph;
+   PreprocessedMap m_preprocessedToOriginal;
+
+   // Shared solution data, not constant. The variables constraints and colorings are in terms of the preprocessed graph.
+   std::vector<StableSetVariable> m_variables;
+   // upper bound info
+   std::vector<std::vector<std::size_t>> m_colorings;
+   std::size_t m_incumbent_index;
+   std::size_t m_upperBound;
+   // lower bound info; //TODO: track or query?
+   std::size_t m_lowerBound;
+   double m_fractionalLowerBound;
+   //TODO: maybe add lower bound certificates in form of clique / mycielski graphs here
+
+   BBTree m_tree;
+
+   std::chrono::high_resolution_clock::time_point m_start_solve_time;
+
+   //printing options
+   int m_printheader_counter;
+};
+}
+#endif // PCOG_SOLUTIONDATA_HPP

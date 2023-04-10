@@ -29,7 +29,7 @@ endif()
 set_if_undefined(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set_if_undefined(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
-add_library(libpcog ) #initialized below
+add_library(libpcog) #initialized below
 add_library(pcog::pcog ALIAS libpcog)
 set_target_properties(libpcog PROPERTIES OUTPUT_NAME "pcog")
 
@@ -40,7 +40,14 @@ if(PCOG_COVERAGE)
     target_code_coverage(libpcog)
 endif()
 
+set_target_properties(libpcog PROPERTIES
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+        VERSION ${PROJECT_VERSION}
+        CXX_STANDARD 20
+        )
+
 find_package(SoPlex REQUIRED)
+message("Libs: " ${SOPLEX_LIBRARY} "includes: " ${SOPLEX_INCLUDE_DIRS})
 #Setup target
 
 include(GenerateExportHeader)
@@ -57,17 +64,17 @@ set(sources
         src/pcog.cpp
         include/pcog/LPSolver.hpp
         src/LPSolver.cpp
-        src/DenseSet.cpp
-        include/pcog/DenseSet.hpp
-        include/pcog/Definitions.hpp
-        src/NodeMap.cpp
-        include/pcog/NodeMap.hpp
-        src/DenseGraph.cpp
-        include/pcog/DenseGraph.hpp
+        src/utilities/DenseSet.cpp
+        include/pcog/utilities/DenseSet.hpp
+        include/pcog/utilities/Definitions.hpp
+        src/utilities/NodeMap.cpp
+        include/pcog/utilities/NodeMap.hpp
+        src/utilities/DenseGraph.cpp
+        include/pcog/utilities/DenseGraph.hpp
         src/GraphIO.cpp
         include/pcog/GraphIO.hpp
-        src/Coloring.cpp
-        include/pcog/Coloring.hpp
+        src/utilities/Coloring.cpp
+        include/pcog/utilities/Coloring.hpp
         src/Preprocessing.cpp
         include/pcog/Preprocessing.hpp
         src/Branching.cpp
@@ -80,18 +87,21 @@ set(sources
         include/pcog/ColorNodeWorker.hpp
         include/pcog/mwss/WeightFunction.hpp
         include/pcog/mwss/CombinatorialStableSet.hpp
-        src/SparseSet.cpp
-        include/pcog/SparseSet.hpp
+        src/utilities/SparseSet.cpp
+        include/pcog/utilities/SparseSet.hpp
         src/StableSetMaximizer.cpp
         include/pcog/StableSetMaximizer.hpp
-        src/Numerics.cpp
-        include/pcog/Numerics.hpp
+        src/utilities/Numerics.cpp
+        include/pcog/utilities/Numerics.hpp
         src/SafeDualWeights.cpp
         include/pcog/SafeDualWeights.hpp
         src/BranchingSelection.cpp
         include/pcog/BranchingSelection.hpp
         src/Statistics.cpp
         include/pcog/Statistics.hpp
+        src/SolutionData.cpp
+        include/pcog/SolutionData.hpp
+        include/pcog/utilities/RbTree.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 
@@ -111,11 +121,7 @@ target_include_directories(libpcog
         ${SOPLEX_INCLUDE_DIRS}
         )
 
-set_target_properties(libpcog PROPERTIES
-        SOVERSION ${PROJECT_VERSION_MAJOR}
-        VERSION ${PROJECT_VERSION}
-        CXX_STANDARD 20
-        )
+
 
 #TODO fix executable target installation etc.
 add_executable(pcog

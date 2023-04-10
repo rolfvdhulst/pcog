@@ -2,8 +2,8 @@
 // Created by rolf on 26-11-22.
 //
 
-#include "pcog/Coloring.hpp"
-#include "pcog/DenseGraph.hpp"
+#include "pcog/utilities/Coloring.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
 // #include "pcog/Preprocessing.h"
 namespace pcog {
 

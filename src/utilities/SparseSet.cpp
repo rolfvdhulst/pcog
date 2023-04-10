@@ -3,8 +3,8 @@
 //
 
 #include <cassert>
-#include "pcog/SparseSet.hpp"
-#include "pcog/DenseSet.hpp"
+#include "pcog/utilities/SparseSet.hpp"
+#include "pcog/utilities/DenseSet.hpp"
 namespace pcog {
 SparseSet::SparseSet() : storage{nullptr}, _size{0}, _capacity{0} {}
 

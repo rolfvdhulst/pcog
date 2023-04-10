@@ -14,9 +14,9 @@
 // excluded nodes? Partition strategies
 
 #include "WeightFunction.hpp"
-#include "pcog/DenseGraph.hpp"
-#include "pcog/DenseSet.hpp"
-#include "pcog/SparseSet.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
+#include "pcog/utilities/DenseSet.hpp"
+#include "pcog/utilities/SparseSet.hpp"
 #include <chrono>
 #include <utility>
 

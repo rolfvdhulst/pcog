@@ -5,7 +5,7 @@
 #ifndef PCOG_INCLUDE_PCOG_MWSS_WEIGHTFUNCTION_HPP
 #define PCOG_INCLUDE_PCOG_MWSS_WEIGHTFUNCTION_HPP
 
-#include "pcog/DenseSet.hpp"
+#include "pcog/utilities/DenseSet.hpp"
 #include <concepts>
 
 namespace pcog {
