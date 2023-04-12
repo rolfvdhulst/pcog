@@ -107,6 +107,8 @@ class BBTree {
 
    [[nodiscard]] std::size_t numOpenNodes() const;
    [[nodiscard]] std::size_t numTotalNodes() const;
+   [[nodiscard]] std::size_t numProcessedNodes() const;
+   [[nodiscard]] double lowerBound() const;
  private:
    // TODO: for now we store the entire b&b tree, but by increasing the
    // per-memory, we can get away with only storing the open nodes Evaluate if

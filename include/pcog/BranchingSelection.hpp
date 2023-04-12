@@ -6,7 +6,7 @@
 #define PCOG_INCLUDE_PCOG_BRANCHINGSELECTION_HPP
 
 #include "ColorSolver.hpp"
-#include "DenseGraph.hpp"
+#include "utilities/DenseGraph.hpp"
 #include "Settings.hpp"
 #include <iostream>
 

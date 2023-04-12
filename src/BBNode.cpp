@@ -74,5 +74,11 @@ std::size_t BBTree::numOpenNodes() const {
 std::size_t BBTree::numTotalNodes() const {
    return m_node_data.size();
 }
+std::size_t BBTree::numProcessedNodes() const {
+   return numTotalNodes()-numOpenNodes();
+}
+double BBTree::lowerBound() const {
+   return 0.0; //TODO
+}
 LPBasis BBNode::basis() const { return m_initialBasis; }
 } // namespace pcog

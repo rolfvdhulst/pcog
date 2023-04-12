@@ -11,6 +11,7 @@
 #include "pcog/utilities/DenseGraph.hpp"
 #include "pcog/utilities/DenseSet.hpp"
 #include "Preprocessing.hpp"
+#include "Settings.hpp"
 
 namespace pcog {
 class StableSetVariable{
@@ -25,7 +26,8 @@ class StableSetVariable{
 /// This data can have frequent reads and writes from multiple threads
 class SolutionData {
  public:
-   explicit SolutionData(const DenseGraph& originalGraph);
+   explicit SolutionData( Settings& t_settings);
+
    /// This data is only changed during presolve, not during branch-and-bound
    [[nodiscard]] const DenseGraph& originalGraph() const;
    const DenseGraph& preprocessedGraph() const;
@@ -33,6 +35,11 @@ class SolutionData {
    const NodeMap& preprocessedToOriginal() const;
    const NodeMap& originalToPreprocessed() const;
 
+   void doPresolve();
+
+   void initializeBBTree();
+
+   const std::vector<StableSetVariable>& variables() const;
    [[nodiscard]] bool isNewSet(const DenseSet& t_set) const;
    std::size_t addStableSet(DenseSet t_set);
    std::size_t findOrAddStableSet(const DenseSet& t_set);
@@ -43,11 +50,26 @@ class SolutionData {
    [[nodiscard]] std::size_t lowerBound() const;
    [[nodiscard]] double fractionalLowerBound() const;
 
-   std::size_t numProcessedNodes() const;
-   std::size_t numOpenNodes() const;
+   BBNode& popNextNode();
+   void createChildren(node_id t_node, ColorNodeWorker& t_nodeWorker);
+
+   [[nodiscard]] std::size_t numProcessedNodes() const;
+   [[nodiscard]] std::size_t numOpenNodes() const;
+   [[nodiscard]] bool hasOpenNodes() const;
+
+   void startSolveTime();
+   void reset(DenseGraph t_graph);
+
+   [[nodiscard]] double timeSinceStart() const;
+   [[nodiscard]] bool checkTimelimitHit() const;
+   [[nodiscard]] bool checkNodeLimitHit() const;
+
+   [[nodiscard]] const Settings& settings() const;
+   void displayHeader(std::ostream& t_stream) const;
+   void display(std::ostream& t_stream);
  private:
    // Original Problem data
-   const DenseGraph& m_originalGraph;
+   DenseGraph m_originalGraph;
    // Problem after presolving.
    DenseGraph m_preprocessedGraph;
    PreprocessedMap m_preprocessedToOriginal;
@@ -69,6 +91,10 @@ class SolutionData {
 
    //printing options
    int m_printheader_counter;
+
+   Settings& m_settings;
+   std::size_t m_lpIterations;
+   std::size_t m_pricingIterations;
 };
 }
 #endif // PCOG_SOLUTIONDATA_HPP

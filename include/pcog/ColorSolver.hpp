@@ -29,14 +29,11 @@ enum class SolverStatus{
 /// a solution pool, the search tree and it provides a simple user interface
 class ColorSolver {
  public:
-   ColorSolver() = default;
+   ColorSolver() : m_solData{m_settings}{};
 
    void setProblem(std::string t_name, DenseGraph t_graph);
 
    SolverStatus solve();
-
-   [[nodiscard]] const DenseGraph& preprocessedGraph() const {return m_preprocessedGraph;}
-   [[nodiscard]] const std::vector<StableSetVariable>& variables() const {return m_variables;}
 
    Settings& settings() { return m_settings;}
    const Settings& settings() const {return m_settings;}
@@ -45,23 +42,16 @@ class ColorSolver {
    void branchAndBound();
    void setStatus(SolverStatus t_status);
    void recordStatistics();
-   bool checkTimelimitHit() const{
-      if(m_settings.timeLimit() == NO_TIME_LIMIT){
-         return false;
-      }
-      auto time = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<double> duration(m_statistics.m_start_solve_time-time);
-      return duration.count() >= m_settings.timeLimit();
-   }
+
    SolverStatus m_status = SolverStatus::NO_PROBLEM;
    ColorNodeWorker m_worker;
 
    //Shared data, constant
    std::string m_problemName;
-
-
-   //settings (TODO implement checks)
+   //settings (TODO implement gap checks etc.)
    Settings m_settings;
+
+   SolutionData m_solData;
 
    //statistics
    Statistics m_statistics;
