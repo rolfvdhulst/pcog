@@ -3,8 +3,8 @@
 //
 
 #include <gtest/gtest.h>
-#include <pcog/Coloring.hpp>
-#include <pcog/DenseGraph.hpp>
+#include <pcog/utilities/Coloring.hpp>
+#include <pcog/utilities/DenseGraph.hpp>
 
 using namespace pcog;
 TEST(SetColoring,construction){

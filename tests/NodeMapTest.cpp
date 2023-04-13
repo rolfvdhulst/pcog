@@ -2,8 +2,8 @@
 // Created by rolf on 24-11-22.
 //
 
-#include <pcog/NodeMap.hpp>
-#include <pcog/DenseSet.hpp>
+#include <pcog/utilities/NodeMap.hpp>
+#include <pcog/utilities/DenseSet.hpp>
 #include "gtest/gtest.h"
 using namespace pcog;
 

@@ -3,7 +3,7 @@
 //
 
 #include <gtest/gtest.h>
-#include <pcog/DenseGraph.hpp>
+#include <pcog/utilities/DenseGraph.hpp>
 using namespace pcog;
 TEST(DenseGraph,constructor){
    DenseGraph defCons;
