@@ -697,13 +697,13 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
 }
 void ColorNodeWorker::processNextNode(SolutionData &t_solData) {
    //TODO: somehow refactor to have cleaner interface for updating the global solution data and this needing to be done less often.
-   BBNode &bb_node = t_solData.popNextNode();
+   BBNode bb_node = t_solData.popNextNode();
 
    processNode(bb_node,t_solData);
    // TODO: check for time limit in processNode and return true/false based on hitting time limits or not
 
    if (bb_node.status() == BBNodeStatus::BRANCHED) {
-      t_solData.createChildren(bb_node.id(),*this);
+      t_solData.createChildren(bb_node,*this);
    }
 
 }

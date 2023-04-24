@@ -6,79 +6,129 @@
 #include "pcog/ColorNodeWorker.hpp"
 namespace pcog {
 
+template<>
+struct RbTreeTraits<BBTree::LowerRbTree> {
+   using KeyType = std::tuple<double,int64_t>;
+   using LinkType = int64_t;
+};
+class BBTree::LowerRbTree : public RbTree<LowerRbTree> {
+   BBTree* m_tree;
+ public:
+   explicit LowerRbTree(BBTree* t_tree) : RbTree<LowerRbTree>(t_tree->lowerRoot,
+                                                              t_tree->lowerMin),
+       m_tree{t_tree}{}
+
+   RbTreeLinks<int64_t>& getRbTreeLinks(int64_t t_node){
+      return m_tree->m_nodes[t_node].getLowerLinks();
+   }
+   [[nodiscard]] const RbTreeLinks<int64_t>& getRbTreeLinks(int64_t t_node) const {
+      return m_tree->m_nodes[t_node].getLowerLinks();
+   }
+   [[nodiscard]] std::tuple<double,int64_t> getKey(int64_t t_node) const {
+      return std::make_tuple(m_tree->m_nodes[t_node].fractionalLowerBound(),t_node);
+   }
+};
+
 void BBTree::clear() {
-   m_node_data.clear();
-   m_open_nodes.clear();
+   while(!m_freeSlots.empty()){ //TODO: can clear more efficiently
+      m_freeSlots.pop();
+   }
+   m_nodes.clear();
    m_selection_strategy = NodeSelectionStrategy::DFS; // TODO: reset selection strategy?
 }
 void BBTree::createRootNode(std::size_t numRootGraphNodes) {
-   assert(m_node_data.empty());
-   assert(m_open_nodes.empty());
+   assert(m_nodes.empty());
+   assert(m_freeSlots.empty());
 
-   m_node_data.emplace_back(0, INVALID_BB_NODE, 0, 0.0, 0,
+
+   m_nodes.emplace_back(0, INVALID_BB_NODE, 0, 0.0, 0,
                             std::vector<BranchData>{BranchData(
                                 INVALID_NODE, INVALID_NODE, BranchType::ROOT)},LPBasis(),NodeMap::identity(numRootGraphNodes));
-   m_open_nodes.emplace_back(0);
+   m_totalNodes = 1;
+   addToTrees(0);
 }
-bool BBTree::hasOpenNodes() const { return !m_open_nodes.empty(); }
-BBNode &BBTree::popNextNode() {
-   node_id node = m_open_nodes.back();
-   m_open_nodes.pop_back();
-   return m_node_data[node];
+bool BBTree::hasOpenNodes() const { return numOpenNodes() != 0; }
+
+BBNode&& BBTree::popNextNode() {
+   int64_t node = lowerMin;
+
+   removeFromTrees(node);
+
+   return std::move(m_nodes[node]);
 }
 void BBTree::pruneUpperBound(std::size_t numColors) {
-   std::erase_if(m_open_nodes,[&](node_id node){
-      if(m_node_data[node].lowerBound() >= numColors){
-         m_node_data[node].setStatus(BBNodeStatus::CUT_OFF); //TODO: is this cleanly called?
-         return true;
-      }
-      return false;
-   });
-}
-void BBTree::createChildren(node_id t_node, ColorNodeWorker &t_nodeWorker) {
+   //Iterate from largest to smallest lowerBound, pruning the nodes with too high lowerBounds away
+   LowerRbTree rbTree(this);
+   int64_t node = rbTree.upper_bound();
 
+   while(node != RbTreeLinks<int64_t>::noLink()){
+      if(m_nodes[node].lowerBound() < numColors) break;
+      int64_t next = rbTree.predecessor(node); //First get the predecessor, before invalidating the node
+      removeFromTrees(node);
+      node = next;
+   }
+}
+void BBTree::createChildren(const BBNode& t_parentNode, ColorNodeWorker &t_nodeWorker) {
    {
-      BBNode &parent_data = m_node_data[t_node];
-      node_id left_id = m_node_data.size();
-      // insert node according to selection rule
-      std::vector<BranchData> branchingPath = parent_data.branchDecisions();
-      branchingPath.emplace_back(parent_data.firstBranchingNode(),
-                                 parent_data.secondBranchNode(),
-                                 BranchType::DIFFER);
-      BBNode left_node(left_id, t_node, parent_data.depth()+1,
-                       parent_data.fractionalLowerBound(),
-                       parent_data.lowerBound(), branchingPath,t_nodeWorker.basis(),t_nodeWorker.mapToFocus());
-      m_node_data.push_back(left_node);
-      m_open_nodes.insert(m_open_nodes.begin(),left_id);
-//      m_open_nodes.push_back(left_id); // TODO: insert according to node ordering
+      BranchData data(t_parentNode.firstBranchingNode(),
+                      t_parentNode.secondBranchNode(),
+                      BranchType::DIFFER);
+      createNode(t_parentNode,t_nodeWorker,{data});
    }
    {
-      BBNode &parent_data = m_node_data[t_node];
-      node_id right_id = m_node_data.size();
-      // insert node according to selection rule
-      std::vector<BranchData> branchingPath = parent_data.branchDecisions();
-      branchingPath.emplace_back(parent_data.firstBranchingNode(),
-                                 parent_data.secondBranchNode(),
-                                 BranchType::SAME);
-      BBNode right_node(right_id, t_node, parent_data.depth()+1,
-                        parent_data.fractionalLowerBound(),
-                        parent_data.lowerBound(), branchingPath,t_nodeWorker.basis(),t_nodeWorker.mapToFocus());
-      m_node_data.push_back(right_node);
-      m_open_nodes.insert(m_open_nodes.begin(),right_id);
-//      m_open_nodes.push_back(right_id); // TODO: insert according to node ordering
+      BranchData data(t_parentNode.firstBranchingNode(),
+                      t_parentNode.secondBranchNode(),
+                      BranchType::SAME);
+      createNode(t_parentNode,t_nodeWorker,{data});
    }
 }
 std::size_t BBTree::numOpenNodes() const {
-   return m_open_nodes.size();
+   return m_nodes.size()-m_freeSlots.size();
 }
 std::size_t BBTree::numTotalNodes() const {
-   return m_node_data.size();
+   return m_totalNodes;
 }
 std::size_t BBTree::numProcessedNodes() const {
    return numTotalNodes()-numOpenNodes();
 }
-double BBTree::lowerBound() const {
-   return 0.0; //TODO
+std::size_t BBTree::lowerBound() const {
+   std::size_t lb = lowerMin == RbTreeLinks<int64_t>::noLink() ? std::numeric_limits<std::size_t>::max()
+                                                               : m_nodes[lowerMin].lowerBound();
+   return lb;
+}
+double BBTree::fractionalLowerBound() const {
+   double lb = lowerMin == RbTreeLinks<int64_t>::noLink() ? std::numeric_limits<double>::infinity() : m_nodes[lowerMin].fractionalLowerBound();
+   return lb;
+}
+void BBTree::createNode(const BBNode &t_parentNode, ColorNodeWorker &t_nodeWorker,
+                        std::vector<BranchData> t_addedBranchinDecisions) {
+   node_id pos;
+   std::vector<BranchData> branchingPath = t_parentNode.branchDecisions();
+   branchingPath.insert(branchingPath.end(),t_addedBranchinDecisions.begin(),t_addedBranchinDecisions.end());
+   if(m_freeSlots.empty()){
+      pos = m_nodes.size();
+      m_nodes.emplace_back(pos, t_parentNode.id(), t_parentNode.depth()+1,
+                           t_parentNode.fractionalLowerBound(),
+                           t_parentNode.lowerBound(), branchingPath,t_nodeWorker.basis(),t_nodeWorker.mapToFocus());
+   }else{
+      pos = m_freeSlots.top();
+      m_freeSlots.pop();
+      m_nodes[pos] = BBNode(pos, t_parentNode.id(), t_parentNode.depth()+1,
+                            t_parentNode.fractionalLowerBound(),
+                            t_parentNode.lowerBound(), branchingPath,t_nodeWorker.basis(),t_nodeWorker.mapToFocus());
+   }
+   ++m_totalNodes;
+   addToTrees(pos);
+
+}
+void BBTree::addToTrees(node_id t_nodeId) {
+   LowerRbTree rbTree(this);
+   rbTree.insert(static_cast<int64_t>(t_nodeId));
+}
+void BBTree::removeFromTrees(node_id t_nodeId) {
+   LowerRbTree rbTree(this);
+   rbTree.erase(static_cast<int64_t>(t_nodeId));
+   m_freeSlots.push(t_nodeId);
 }
 LPBasis BBNode::basis() const { return m_initialBasis; }
 } // namespace pcog

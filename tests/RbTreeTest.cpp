@@ -22,8 +22,9 @@ struct RbTreeTraits<MyTree>{
 class MyTree : public RbTree<MyTree> {
  public:
    int64_t root = -1;
+   int64_t min = -1;
    std::vector<Node> nodes;
-   MyTree() : RbTree<MyTree>(root) {};
+   MyTree() : RbTree<MyTree>(root,min) {};
    RbTreeLinks<int64_t>& getRbTreeLinks(int64_t node){
       return nodes[node].links;
    }

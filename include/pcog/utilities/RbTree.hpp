@@ -21,11 +21,11 @@ template <typename T> struct RbTreeTraits;
 
 template <RbTreeIndex T> struct RbTreeLinks {
 
-   std::array<T, 2> child;
+   std::array<T, 2> child = {noLink(),noLink()};
 
    static constexpr T noLink() { return -1; }
    using ParentStorageType = typename std::make_unsigned<T>::type;
-   ParentStorageType parentAndColor;
+   ParentStorageType parentAndColor = 0;
 
    static constexpr int colorBitPos() {
       return sizeof(ParentStorageType) * 8 - 1;
@@ -64,6 +64,7 @@ template <typename T> class RbTree {
    using ColorType = typename RbTreeLinks<LinkType >::ParentStorageType;
 
    LinkType &rootNode;
+   LinkType &lowerNode;
 
    static constexpr LinkType NO_LINK = RbTreeLinks<LinkType>::noLink();
 
@@ -226,7 +227,9 @@ template <typename T> class RbTree {
       if (x != NO_LINK) makeBlack(x);
    }
  public:
-   RbTree(LinkType &t_rootNode) : rootNode{t_rootNode} {};
+   RbTree(LinkType &t_rootNode, LinkType& t_lowerNode) : rootNode{t_rootNode},
+                                                         lowerNode{t_lowerNode}
+                                                         {};
 
    ///Returns true if the RbTree is empty
    [[nodiscard]] bool empty() const { return rootNode == NO_LINK; }
@@ -249,7 +252,7 @@ template <typename T> class RbTree {
       }
    }
 
-   LinkType lower_bound() const { return lower_bound(rootNode); }
+   LinkType lower_bound() const { return lowerNode; }
 
    LinkType upper_bound() const { return upper_bound(rootNode); }
 
@@ -288,6 +291,11 @@ template <typename T> class RbTree {
 
    ///Inserts the node into the rb tree with the given parent
    void insert(LinkType node, LinkType parent) {
+      // if we insert an element smaller than the parent, update the smallest element index
+      if(lowerNode == parent &&
+          (parent == RbTreeLinks<LinkType>::noLink() || getKey(node) < getKey(parent)) ){
+         lowerNode = node;
+      }
       setParent(node, parent);
       if (parent == NO_LINK){
          rootNode = node;
@@ -306,13 +314,16 @@ template <typename T> class RbTree {
       LinkType x = rootNode;
       while (x != NO_LINK) {
          y = x;
-         x = getChild(y, Dir(getKey(x) < getKey(node)));
+         x = getChild(y, Direction(getKey(x) < getKey(node)));
       }
 
       static_cast<T*>(this)->insert(node, y);
    }
 
    void erase(LinkType node) {
+      if(node == lowerNode){
+         lowerNode = successor(lowerNode);
+      }
       LinkType nilParent = NO_LINK;
       LinkType y = node;
       bool yWasBlack = isBlack(y);

@@ -8,12 +8,13 @@
 #include <queue>
 #include <utility>
 #include "LPSolver.hpp"
+#include "utilities/RbTree.hpp"
 
 namespace pcog {
 enum class BBNodeStatus {
    INITIALIZED,
    PROCESSING,
-   BRANCHED, // Node was solved, but
+   BRANCHED, // Node was solved, and branching was performed
    CUT_OFF,  // Node was cut off e.g. the lower bound was greater than the upper
              // bound
 };
@@ -70,6 +71,10 @@ class BBNode {
    }
    [[nodiscard]] LPBasis basis() const;
    [[nodiscard]] NodeMap previousNodeMap() const {return m_previousNodeMap;}
+
+   RbTreeLinks<int64_t>& getLowerLinks() { return m_lowerLinks; }
+   const RbTreeLinks<int64_t>& getLowerLinks() const { return m_lowerLinks; }
+
  private:
    node_id m_id;
    node_id m_parent_id;
@@ -84,18 +89,21 @@ class BBNode {
 
    NodeMap m_previousNodeMap; //needed to interpret previous basis
    LPBasis m_initialBasis;
+
+   RbTreeLinks<int64_t> m_lowerLinks;
 };
 
 enum class NodeSelectionStrategy { DFS, BFS, BEST_BOUND };
 class BBTree {
  public:
+   class LowerRbTree;
    /// Clear all the information stored in this object.
    void clear();
    void createRootNode(std::size_t numRootGraphNodes);
 
    [[nodiscard]] bool hasOpenNodes() const;
 
-   BBNode &popNextNode();
+   BBNode&& popNextNode();
 
    /**
     * Remove branch-and-bound nodes whoms
@@ -103,19 +111,36 @@ class BBTree {
     * @param numColors
     */
    void pruneUpperBound(std::size_t numColors);
-   void createChildren(node_id t_node, ColorNodeWorker& t_nodeWorker);
+   void createChildren(const BBNode& t_parentNode, ColorNodeWorker& t_nodeWorker);
 
    [[nodiscard]] std::size_t numOpenNodes() const;
    [[nodiscard]] std::size_t numTotalNodes() const;
    [[nodiscard]] std::size_t numProcessedNodes() const;
-   [[nodiscard]] double lowerBound() const;
+   [[nodiscard]] double fractionalLowerBound() const;
+   [[nodiscard]] std::size_t lowerBound() const;
  private:
-   // TODO: for now we store the entire b&b tree, but by increasing the
-   // per-memory, we can get away with only storing the open nodes Evaluate if
-   // the memory savings are worth it.
-   std::vector<BBNode> m_node_data;
-   std::vector<node_id> m_open_nodes; // sorted by selection priority,
+   void createNode(const BBNode& t_parentNode,
+                   ColorNodeWorker& worker,
+                   std::vector<BranchData> t_addedBranchingDecisions);
+
+   ///Newly links the adding it to the distributed ordered set structures.
+   ///This ensures we can efficiently select the next open node and keep track
+   ///of the lower bound
+   void addToTrees(node_id t_nodeId);
+   void removeFromTrees(node_id t_nodeId);
+
+   std::vector<BBNode> m_nodes;
+   std::priority_queue<node_id,std::vector<node_id>,std::greater<>> m_freeSlots;
+
+
    NodeSelectionStrategy m_selection_strategy;
+
+
+   int64_t lowerRoot = RbTreeLinks<int64_t>::noLink();
+   int64_t lowerMin = RbTreeLinks<int64_t>::noLink();
+
+   std::size_t m_totalNodes = 0;
+
 };
 
 } // namespace pcog

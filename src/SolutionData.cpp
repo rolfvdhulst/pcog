@@ -191,7 +191,7 @@ void SolutionData::display(std::ostream& t_stream){
             << std::setw(7) << std::right<< memory <<" | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numProcessedNodes() << " | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numOpenNodes() << " | "
-            << std::scientific << std::setw(6) << std::setprecision(0) << std::right << m_tree.lowerBound() << " | "
+            << std::fixed << std::setw(6) << std::setprecision(2) << std::right << m_tree.fractionalLowerBound() << " | "
             << std::scientific << std::setw(6) << std::setprecision(2) << std::right << m_upperBound << " | "
             << std::scientific << std::setw(5) << std::setprecision(2) << std::right << m_variables.size() << " | "
             << std::scientific << std::setw(7) << std::setprecision(2) << std::right << m_lpIterations << " | "
@@ -246,10 +246,10 @@ const std::vector<StableSetVariable> &SolutionData::variables() const {
    return m_variables;
 }
 const Settings &SolutionData::settings() const { return m_settings; }
-BBNode &SolutionData::popNextNode() {
+BBNode && SolutionData::popNextNode() {
    return m_tree.popNextNode();
 }
-void SolutionData::createChildren(node_id t_node,
+void SolutionData::createChildren(const BBNode& t_node,
                                   ColorNodeWorker &t_nodeWorker) {
    m_tree.createChildren(t_node,t_nodeWorker);
 }

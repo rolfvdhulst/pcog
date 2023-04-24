@@ -50,8 +50,8 @@ class SolutionData {
    [[nodiscard]] std::size_t lowerBound() const;
    [[nodiscard]] double fractionalLowerBound() const;
 
-   BBNode& popNextNode();
-   void createChildren(node_id t_node, ColorNodeWorker& t_nodeWorker);
+   BBNode&& popNextNode();
+   void createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
 
    [[nodiscard]] std::size_t numProcessedNodes() const;
    [[nodiscard]] std::size_t numOpenNodes() const;
