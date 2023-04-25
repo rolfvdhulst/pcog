@@ -299,11 +299,11 @@ void SolutionData::updateFractionalLowerBound(double t_fractional_lb) {
 }
 void SolutionData::updateTreeBounds() {
    if(m_tree.hasOpenNodes()) {
-      updateLowerBound(m_tree.lowerBound());
       updateFractionalLowerBound(m_tree.fractionalLowerBound());
+      updateLowerBound(m_tree.lowerBound());
    }else {
-      updateLowerBound(m_upperBound);
       updateFractionalLowerBound(m_upperBound);
+      updateLowerBound(m_upperBound);
    }
 
 }

@@ -384,7 +384,12 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
 
       node.updateLowerBound(derivedLowerBound);
    }
-
+   //Ensure we keep the solution data up to date if we improve the global lower bound (e.g. we are in the root node).
+   //For now, the case where we are not in the root node but improve the global bound is handled by b&b code itself,
+   //but here we need to notify the pricing system somehow
+   if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBound()){
+      writeNodeStatistics(node,t_solData);
+   }
    addColumns(newSets, t_solData);
    return PricingResult::FOUND_COLUMN; // TODO: pick up on abort here
 }
@@ -728,8 +733,8 @@ void ColorNodeWorker::writeNodeStatistics(BBNode& t_node, SolutionData &t_data) 
    m_numPricingIterations = 0;
 
    if(t_node.depth() == 0){
-      t_data.updateLowerBound(t_node.lowerBound());
       t_data.updateFractionalLowerBound(t_node.fractionalLowerBound());
+      t_data.updateLowerBound(t_node.lowerBound());
    }
 
 }
