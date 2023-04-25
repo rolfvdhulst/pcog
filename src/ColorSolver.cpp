@@ -48,6 +48,7 @@ SolverStatus ColorSolver::solve() {
    assert(m_status == SolverStatus::PRESOLVED);
    branchAndBound();
    recordStatistics();
+   displayEndResult(std::cout);
    return m_status;
 }
 void ColorSolver::setStatus(SolverStatus t_status) {
@@ -60,7 +61,7 @@ SolverStatus ColorSolver::presolve() {
    m_solData.doPresolve();
    setStatus(SolverStatus::PRESOLVED);
    auto time_end = std::chrono::high_resolution_clock::now();
-   m_statistics.m_presolve_time = std::chrono::duration<double>(time_end - time_start).count();
+   m_statistics.m_presolve_time = std::chrono::duration<double>(time_end - time_start);
    return m_status;
 }
 void ColorSolver::branchAndBound() {
@@ -83,8 +84,7 @@ void ColorSolver::branchAndBound() {
       }
    }
    auto time_end = std::chrono::high_resolution_clock::now();
-   m_statistics.m_branch_and_bound_time =
-       std::chrono::duration<double>(time_end - time_start).count();
+   m_statistics.m_branch_and_bound_time = std::chrono::duration<double>(time_end - time_start);
    // TODO: be careful with termination from time limit in processNode before
    // branching when only one node is left
    m_status = m_solData.lowerBound() == m_solData.upperBound()
@@ -93,6 +93,37 @@ void ColorSolver::branchAndBound() {
 void ColorSolver::recordStatistics() {
    m_statistics.m_total_solve_time = m_solData.timeSinceStart();
 }
+void ColorSolver::displayEndResult(std::ostream &t_stream) {
+   // status
+   // time taken
+   // num branch and bound nodes
+   // lower bound and upper bound
 
+   t_stream << "\nStatus                 : ";
+   switch(m_status){
+   case SolverStatus::NO_PROBLEM:
+   case SolverStatus::PROBLEM_INITIALIZED:
+   case SolverStatus::PRESOLVING:
+   case SolverStatus::PRESOLVED:
+   case SolverStatus::SOLVING:
+      std::cout<<"Unknown status"; //TODO: fix
+      break;
+   case SolverStatus::SOLVED_SUBOPTIMALLY:
+      t_stream <<"Solution found but proved to be optimal";
+      break;
+   case SolverStatus::SOLVED_OPTIMALLY:
+      t_stream <<"Optimal solution found";
+      break;
+   case SolverStatus::ERROR:
+      t_stream <<"Unknown error";
+      break;
+   }
+   t_stream << "\n";
+   t_stream << std::fixed;
+   t_stream << "Solution time          : " << m_statistics.m_total_solve_time <<"\n";
+   t_stream << "Branch-and-bound nodes : " << m_solData.numProcessedNodes() <<"\n";
+   t_stream << "Lower bound            : " << m_solData.lowerBound()<<"\n";
+   t_stream << "Upper bound            : " << m_solData.upperBound()<<"\n"<<std::flush;
+}
 
 } // namespace pcog

@@ -9,9 +9,9 @@
 
 struct Statistics {
    void reset();
-   double m_presolve_time;
-   double m_branch_and_bound_time;
-   double m_total_solve_time;
+   std::chrono::duration<double> m_presolve_time;
+   std::chrono::duration<double> m_branch_and_bound_time;
+   std::chrono::duration<double> m_total_solve_time;
 
 };
 

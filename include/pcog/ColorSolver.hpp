@@ -42,6 +42,7 @@ class ColorSolver {
    void branchAndBound();
    void setStatus(SolverStatus t_status);
    void recordStatistics();
+   void displayEndResult(std::ostream& stream);
 
    SolverStatus m_status = SolverStatus::NO_PROBLEM;
    ColorNodeWorker m_worker;

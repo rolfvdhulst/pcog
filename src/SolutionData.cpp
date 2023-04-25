@@ -213,15 +213,15 @@ void SolutionData::display(std::ostream& t_stream){
             << std::endl;
    ++m_printheader_counter;
 }
-double SolutionData::timeSinceStart() const {
-   return std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start_solve_time).count();
+std::chrono::duration<double> SolutionData::timeSinceStart() const {
+   return std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start_solve_time);
 }
 bool SolutionData::checkTimelimitHit() const {
    double timeLimit = m_settings.timeLimit();
    if (timeLimit == NO_TIME_LIMIT) {
       return false;
    }
-   return timeSinceStart() >= timeLimit;
+   return timeSinceStart().count() >= timeLimit;
 }
 
 void SolutionData::startSolveTime() {
