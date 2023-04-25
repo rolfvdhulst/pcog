@@ -88,6 +88,19 @@ std::string bytesToString(std::size_t bytes){
    std::string str = stream.str() + extension[extension_ind];
    return str;
 }
+std::string itsToString(std::size_t iterations) {
+   static constexpr std::array<const char *, 4> extension = {"", "k", "M", "B"};
+   std::size_t extension_ind = 0;
+   double show = iterations;
+   while(extension_ind < 4 && show > 1'000.0){
+      show /= 1000.0;
+      ++extension_ind;
+   }
+   std::stringstream stream;
+   stream << std::setprecision(3) << show;
+   std::string str = stream.str() + extension[extension_ind];
+   return str;
+}
 
 void SolutionData::addSolution(std::vector<std::size_t> t_stable_set_indices) {
 #ifndef NDEBUG
@@ -171,9 +184,9 @@ const DenseGraph &SolutionData::originalGraph() const {
 }
 void SolutionData::displayHeader(std::ostream& t_stream) const{
    if(m_printheader_counter == 0){
-      t_stream << "      System      |        Nodes        |      Bounds     |            Work              \n";
+      t_stream << "      System      |        Nodes        |          Bounds          |            Work              \n";
    }
-   t_stream << "   time |  memory | explored |     open |  lower |  upper |  vars |   LP it | Pric it | \n";
+   t_stream << "   time |  memory | explored |     open |   frac |  lower |  upper |  vars |   LP it | Pric it | \n";
 }
 void SolutionData::display(std::ostream& t_stream){
    if(m_printheader_counter % 20 == 0){
@@ -191,11 +204,12 @@ void SolutionData::display(std::ostream& t_stream){
             << std::setw(7) << std::right<< memory <<" | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numProcessedNodes() << " | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numOpenNodes() << " | "
-            << std::fixed << std::setw(6) << std::setprecision(2) << std::right << m_tree.fractionalLowerBound() << " | "
+            << std::fixed << std::setw(6) << std::setprecision(2) << std::right << m_fractionalLowerBound << " | "
+            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << m_lowerBound << " | "
             << std::scientific << std::setw(6) << std::setprecision(2) << std::right << m_upperBound << " | "
             << std::scientific << std::setw(5) << std::setprecision(2) << std::right << m_variables.size() << " | "
-            << std::scientific << std::setw(7) << std::setprecision(2) << std::right << m_lpIterations << " | "
-            << std::scientific << std::setw(7) << std::setprecision(2) << std::right << m_pricingIterations << " | "
+            << std::scientific << std::setw(7) << std::setprecision(2) << std::right << itsToString(m_lpIterations) << " | "
+            << std::scientific << std::setw(7) << std::setprecision(2) << std::right << itsToString(m_pricingIterations) << " | "
             << std::endl;
    ++m_printheader_counter;
 }
@@ -265,4 +279,32 @@ const NodeMap &SolutionData::preprocessedToOriginal() const {
 const NodeMap &SolutionData::originalToPreprocessed() const {
    return m_preprocessedToOriginal.oldToNewIDs;
 }
-} // namespace pcog
+void SolutionData::addPricingIterations(std::size_t count) {
+   m_pricingIterations += count;
+}
+void SolutionData::addLPIterations(std::size_t count) {
+   m_lpIterations += count;
+}
+void SolutionData::updateLowerBound(std::size_t t_lb) {
+   if(t_lb > m_lowerBound){
+      m_lowerBound = t_lb;
+      //TODO: are there any lb changes we need to trigger here?
+      display(std::cout);
+   }
+}
+void SolutionData::updateFractionalLowerBound(double t_fractional_lb) {
+   if(t_fractional_lb > m_fractionalLowerBound){
+      m_fractionalLowerBound = t_fractional_lb;
+   }
+}
+void SolutionData::updateTreeBounds() {
+   if(m_tree.hasOpenNodes()) {
+      updateLowerBound(m_tree.lowerBound());
+      updateFractionalLowerBound(m_tree.fractionalLowerBound());
+   }else {
+      updateLowerBound(m_upperBound);
+      updateFractionalLowerBound(m_upperBound);
+   }
+
+}
+}// namespace pcog

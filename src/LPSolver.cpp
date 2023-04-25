@@ -157,5 +157,8 @@ void LPSolver::setObjectiveUpperLimit(double limit) {
 void LPSolver::changeBounds(ColIdx col, double lb, double ub) {
    m_soplex.changeBoundsReal(col,lb,ub);
 }
+std::size_t LPSolver::numIterations() const{
+   return static_cast<size_t>(m_soplex.numIterations());
+}
 
 } // namespace pcog

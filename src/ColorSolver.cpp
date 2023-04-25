@@ -76,7 +76,11 @@ void ColorSolver::branchAndBound() {
           m_solData.checkTimelimitHit()) {
          break;
       }
-      m_solData.display(std::cout);
+      //Display every n'th node and the root node
+      if(m_solData.numProcessedNodes() == 1  ||
+          m_solData.numProcessedNodes() % m_settings.nodeDisplayFrequency() == 0 ){
+         m_solData.display(std::cout);
+      }
    }
    auto time_end = std::chrono::high_resolution_clock::now();
    m_statistics.m_branch_and_bound_time =

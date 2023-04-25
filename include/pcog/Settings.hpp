@@ -41,9 +41,13 @@ class Settings {
                 m_branchingStrategy{BranchingStrategy::INTERSECTION_UNION_SIZE},
                 m_branchCandidateSelectionStrategy{CandidateSelectionStrategy::VIOLATED_IN_BOTH},
                 m_rounding_tolerance{1e-8},
-                m_diving_frequency{-1},
-                m_diving_pricing_frequency{-1}
+                m_diving_frequency{0},
+                m_diving_pricing_frequency{0},
+                m_nodeDisplayFrequency{50}
                 {};
+
+   void setNodeDisplayFrequency(std::size_t frequency) {m_nodeDisplayFrequency = frequency;}
+   [[nodiscard]] std::size_t nodeDisplayFrequency() const {return m_nodeDisplayFrequency;}
 
    ///Settings e.g. methods that will typically not affect performance (except for determining the starting/ending point)
    void setNodeLimit(std::size_t t_node_limit) { m_node_limit = t_node_limit; }
@@ -104,6 +108,8 @@ class Settings {
    /// Frequencies: -1 : never, 0 = only at root node, otherwise only at depths divisible by frequency
    int m_diving_frequency; /// Frequency for executing the diving heuristic
    int m_diving_pricing_frequency; /// Frequency for finding columns
+
+   std::size_t m_nodeDisplayFrequency;
 };
 
 #endif // PCOG_INCLUDE_PCOG_SETTINGS_HPP

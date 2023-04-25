@@ -11,13 +11,15 @@
 // TODO: add error handling, particularly LP-related.
 namespace pcog {
 void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
+   resetNodeStatistics();
+
    // Node preprocessing to compute focus graph and complete focus graph
    setupGraphs(t_node, t_solData);
    // Set up LP representation
    setupLP(t_node, t_solData);
    m_focusNode = t_node.id();
    // Solve lp
-   m_lpSolver.solve();
+   solveLP();
    // Farkas pricing: price in new columns until lp solution is feasible
    while (m_lpSolver.status() == LPSolverStatus::INFEASIBLE) {
       farkasPricing(t_node, t_solData);
@@ -33,6 +35,8 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
    pricingLoop(t_node, t_solData,false);
    computeBranchingVertices(t_node, t_solData);
    divingHeuristic(t_node,t_solData);
+
+   writeNodeStatistics(t_node,t_solData);
 }
 void ColorNodeWorker::setupGraphs(BBNode &node, const SolutionData &solver) {
 
@@ -191,7 +195,7 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node, SolutionData &t_solData) {
    }
    // Add new columns and resolve LP
    addColumns(pricedSets, t_solData);
-   m_lpSolver.solve();
+   solveLP();
 }
 void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool duringDiving) {
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
@@ -208,7 +212,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
          break;
       }
       // Resolve lp with newly added columns
-      m_lpSolver.solve();
+      solveLP();
       if (m_lpSolver.status() != LPSolverStatus::OPTIMAL) {
          // TODO: error handling
          break;
@@ -269,7 +273,7 @@ void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
 PricingResult ColorNodeWorker::priceColumn(BBNode &node,
                                            SolutionData &t_solData,
                                            bool duringDiving) {
-
+   ++m_numPricingIterations;
    // Get dual weights and make them numerically safe
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    assert(m_lpSolver.numRows() == m_focusGraph.numNodes());
@@ -477,6 +481,8 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
          for(const auto& elem : color_indices){
             indices.emplace_back(elem->index);
          }
+         //we synchronize data so it looks nice when we display
+         writeNodeStatistics(node,t_solData);
          t_solData.addSolution(indices);
       }else{
          // Need to repair the solution.
@@ -498,6 +504,8 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
             maximizeStableSet(color,m_completeFocusGraph);
          }
          auto indices = repairColoring(colors,t_solData);
+
+         writeNodeStatistics(node,t_solData);
          t_solData.addSolution(indices);
          std::size_t after = t_solData.variables().size();
 
@@ -560,7 +568,7 @@ ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring,
       }
    }
    addColumnsToLP(toAddSets,t_solData);
-   m_lpSolver.solve();
+   solveLP();
    return colorIndices;
 }
 void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
@@ -645,7 +653,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       m_lpSolver.changeBounds(best_it->column,1.0,soplex::infinity); //TODO: test setting upper bounds?
       fixedUpperBoundVars.push_back(best_it->column);
       //resolve the LP
-      bool status = m_lpSolver.solve();
+      bool status = solveLP();
       if(!status){ //exits when the LP solver has an error or the objective is cut off
          break;
       }
@@ -677,6 +685,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       }
       if(originalUncolored.empty()) {
          // no need to repair
+         writeNodeStatistics(t_node,t_solData);
          t_solData.addSolution(indices);
       }else{
          std::cout<<"Could not repair diving solution : "<<m_lpSolver.objective()<<"\n";
@@ -705,7 +714,29 @@ void ColorNodeWorker::processNextNode(SolutionData &t_solData) {
    if (bb_node.status() == BBNodeStatus::BRANCHED) {
       t_solData.createChildren(bb_node,*this);
    }
+   //Re-check the lower bounds from the trees
+   t_solData.updateTreeBounds();
+}
+void ColorNodeWorker::resetNodeStatistics() {
+   m_numLPIterations = 0;
+   m_numPricingIterations = 0;
+}
+void ColorNodeWorker::writeNodeStatistics(BBNode& t_node, SolutionData &t_data) {
+   t_data.addLPIterations(m_numLPIterations);
+   t_data.addPricingIterations(m_numPricingIterations);
+   m_numLPIterations = 0;
+   m_numPricingIterations = 0;
 
+   if(t_node.depth() == 0){
+      t_data.updateLowerBound(t_node.lowerBound());
+      t_data.updateFractionalLowerBound(t_node.fractionalLowerBound());
+   }
+
+}
+bool ColorNodeWorker::solveLP() {
+   bool status = m_lpSolver.solve();
+   m_numLPIterations += m_lpSolver.numIterations();
+   return status;
 }
 
 } // namespace pcog

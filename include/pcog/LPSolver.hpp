@@ -93,6 +93,8 @@ class LPSolver {
    LPBasis getLPBasis();
 
    void setBasis(const LPBasis& basis);
+
+   std::size_t numIterations() const;
  private:
    soplex::SoPlex m_soplex;
 };

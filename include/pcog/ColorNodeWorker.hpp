@@ -64,6 +64,14 @@ class ColorNodeWorker {
    DenseGraph m_focusGraph;
    DenseGraph m_completeFocusGraph;
    PreprocessedMap m_mapToPreprocessed;
+   bool solveLP();
+
+   void resetNodeStatistics();
+   void writeNodeStatistics(BBNode& node, SolutionData& t_data);
+   //node statistics
+   std::size_t m_numLPIterations = 0;
+   std::size_t m_numPricingIterations = 0;
+
 };
 } // namespace pcog
 

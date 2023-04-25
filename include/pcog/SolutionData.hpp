@@ -50,6 +50,12 @@ class SolutionData {
    [[nodiscard]] std::size_t lowerBound() const;
    [[nodiscard]] double fractionalLowerBound() const;
 
+   //These functions should only be called either during (or before) processing of the root node,
+   //or after a node has been solved and we evaluate the b&b tree
+   void updateLowerBound(std::size_t t_lb);
+   void updateFractionalLowerBound(double t_fractional_lb);
+   void updateTreeBounds();
+
    BBNode&& popNextNode();
    void createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
 
@@ -67,6 +73,9 @@ class SolutionData {
    [[nodiscard]] const Settings& settings() const;
    void displayHeader(std::ostream& t_stream) const;
    void display(std::ostream& t_stream);
+
+   void addPricingIterations(std::size_t count);
+   void addLPIterations(std::size_t count);
  private:
    // Original Problem data
    DenseGraph m_originalGraph;
