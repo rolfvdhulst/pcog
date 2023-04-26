@@ -302,6 +302,7 @@ void SolutionData::updateTreeBounds() {
       updateFractionalLowerBound(m_tree.fractionalLowerBound());
       updateLowerBound(m_tree.lowerBound());
    }else {
+      //In case the node-queue is empty, we have proven that the lower and upper bounds are equal :)
       updateFractionalLowerBound(m_upperBound);
       updateLowerBound(m_upperBound);
    }
