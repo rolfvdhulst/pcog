@@ -250,14 +250,20 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    //TODO: how to sort/choose between node1 /node2?
 
    constexpr bool neighbourHoodDisjunction = true;
+   Node firstNode = focusToPreprocessed[best_it->node1];
+   Node secondNode = focusToPreprocessed[best_it->node2];
+   node.setBranchingNodes(firstNode,secondNode);
 
-   if(neighbourHoodDisjunction){
+   if(!neighbourHoodDisjunction) {
+      node.setBranchingData(
+          {{BranchData(firstNode, secondNode, BranchType::SAME)},
+           {BranchData(firstNode, secondNode, BranchType::DIFFER)}});
+   }else{
       DenseSet differenceOne = m_focusGraph.neighbourhood(best_it->node1).difference(m_focusGraph.neighbourhood(best_it->node2));
       DenseSet differenceTwo = m_focusGraph.neighbourhood(best_it->node2).difference(m_focusGraph.neighbourhood(best_it->node1));
 
       bool firstSmaller = differenceOne.size() <= differenceTwo.size();
-      Node firstNode = focusToPreprocessed[best_it->node1];
-      Node secondNode = focusToPreprocessed[best_it->node2];
+
       std::vector<std::vector<BranchData>> data{{BranchData(firstNode,secondNode,BranchType::SAME)}};
 
       const auto& differChoice = firstSmaller ? differenceOne : differenceTwo;
@@ -275,14 +281,7 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
          data.emplace_back(branching);
       }
 
-      node.setBranchingNodes(firstNode,secondNode);
       node.setBranchingData(data);
-   }else{
-      Node firstNode = focusToPreprocessed[best_it->node1];
-      Node secondNode = focusToPreprocessed[best_it->node2];
-      node.setBranchingNodes(firstNode,secondNode);
-      node.setBranchingData({{BranchData(firstNode,secondNode,BranchType::SAME)},
-                             {BranchData(firstNode,secondNode,BranchType::DIFFER)}});
    }
 
    node.setStatus(BBNodeStatus::BRANCHED);
