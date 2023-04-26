@@ -97,7 +97,7 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
    case BranchingStrategy::TRIANGLES_ADDED_SCALED:
       scoreScaledTriangles(candidates, graph);
       return;
-   case BranchingStrategy::HELDS_RULE: //TODO: fix
+   case BranchingStrategy::HELDS_RULE:
    {
       auto lpSol = t_lpSolver.getPrimalSolution();
       scoreHeldsRule(candidates,lpSol,variables,mapToPreprocessed);
@@ -133,7 +133,16 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
       scoreMinRemovalSize(candidates,lpSol,variables,mapToPreprocessed);
       return;
    }
+   case BranchingStrategy::SMALL_DIFFERENCE:{
+      for(auto& candidate : candidates){
+         std::size_t size_1 = graph.neighbourhood(candidate.node1).difference(graph.neighbourhood(candidate.node2)).size();
+         std::size_t size_2 = graph.neighbourhood(candidate.node2).difference(graph.neighbourhood(candidate.node1)).size();
+         std::size_t min_diff = std::min(size_1,size_2);
+         std::size_t sum = graph.neighbourhood(candidate.node1).size() + graph.neighbourhood(candidate.node2).size();
+         candidate.score = -double(min_diff) + double(sum)/(2*double(graph.numNodes()));
+      }
 
+   }
    }
 }
 void scoreScaledTriangles(std::vector<ScoredEdge> &candidates,

@@ -69,17 +69,8 @@ void BBTree::pruneUpperBound(std::size_t numColors) {
    }
 }
 void BBTree::createChildren(const BBNode& t_parentNode, ColorNodeWorker &t_nodeWorker) {
-   {
-      BranchData data(t_parentNode.firstBranchingNode(),
-                      t_parentNode.secondBranchNode(),
-                      BranchType::DIFFER);
-      createNode(t_parentNode,t_nodeWorker,{data});
-   }
-   {
-      BranchData data(t_parentNode.firstBranchingNode(),
-                      t_parentNode.secondBranchNode(),
-                      BranchType::SAME);
-      createNode(t_parentNode,t_nodeWorker,{data});
+   for(const auto& data : t_parentNode.branchingData()){
+      createNode(t_parentNode,t_nodeWorker,data);
    }
 }
 std::size_t BBTree::numOpenNodes() const {

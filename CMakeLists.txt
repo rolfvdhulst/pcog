@@ -102,6 +102,8 @@ set(sources
         src/SolutionData.cpp
         include/pcog/SolutionData.hpp
         include/pcog/utilities/RbTree.hpp
+        src/Settings.cpp
+        include/pcog/Settings.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

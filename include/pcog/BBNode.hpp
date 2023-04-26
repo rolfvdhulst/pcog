@@ -75,6 +75,12 @@ class BBNode {
    RbTreeLinks<int64_t>& getLowerLinks() { return m_lowerLinks; }
    const RbTreeLinks<int64_t>& getLowerLinks() const { return m_lowerLinks; }
 
+   [[nodiscard]] const std::vector<std::vector<BranchData>>& branchingData() const{
+      return m_branchingData;
+   }
+   void setBranchingData(std::vector<std::vector<BranchData>> branchData ){
+      m_branchingData = std::move(branchData);
+   }
  private:
    node_id m_id;
    node_id m_parent_id;
@@ -84,8 +90,10 @@ class BBNode {
    BBNodeStatus m_status;
    double m_fractionalLowerBound;
    std::size_t m_lowerBound;
+
    Node m_firstBranchNode;
    Node m_secondBranchNode;
+   std::vector<std::vector<BranchData>> m_branchingData;
 
    NodeMap m_previousNodeMap; //needed to interpret previous basis
    LPBasis m_initialBasis;
