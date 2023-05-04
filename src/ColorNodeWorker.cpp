@@ -7,6 +7,7 @@
 #include "pcog/BranchingSelection.hpp"
 #include "pcog/ColorSolver.hpp"
 #include "pcog/mwss/CombinatorialStableSet.hpp"
+#include "pcog/mwss/AugmentingSearch.hpp"
 
 // TODO: add error handling, particularly LP-related.
 namespace pcog {
@@ -32,6 +33,10 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
    }
 
    // Price-lp loop
+   //TODO: pricing stores the basis, but ideally we only want to compute branching vertices after diving.
+   //TODO: however, diving destroys LP information. Two options:
+   // 1. reset LP manually before computing branching solutions (downside = restoring basis might be expensive)
+   // 2. perform diving in a separate LP solver object (downside = lots of copying)
    pricingLoop(t_node, t_solData,false);
    computeBranchingVertices(t_node, t_solData);
    divingHeuristic(t_node,t_solData);
@@ -52,7 +57,6 @@ void ColorNodeWorker::setupGraphs(BBNode &node, const SolutionData &solver) {
       auto [completeGraph, result] =
           constructBranchedGraphs(solver.preprocessedGraph(),
                                   node.branchDecisions(), node.lowerBound());
-      // TODO: check if moving is necesary here or if auto-detected.
       m_completeFocusGraph = completeGraph;
       m_focusGraph = result.graph;
       m_mapToPreprocessed = result.map;
@@ -101,6 +105,8 @@ void ColorNodeWorker::setupLP(BBNode &bb_node, const SolutionData &t_solData) {
    // TODO: adjust method below so that the lp is not reinitialized from scratch
    // every time
    m_lpSolver.clear();
+
+   m_lpSolver.setIntegralityPolishing(true);
    m_lpSolver.setObjectiveSense(ObjectiveSense::MINIMIZE);
    for (Node vertex = 0; vertex < m_mapToPreprocessed.newToOldIDs.size();
         ++vertex) {
@@ -257,6 +263,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
          break;
       }
    }
+   node.setBasis(m_lpSolver.getLPBasis()); //TODO: only save here when diving, maybe?
 }
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
                                                const SolutionData &t_solData) {
@@ -287,6 +294,7 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    assert(best_it != scoredEdges.end());
    assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
    //TODO: how to sort/choose between node1 /node2?
+   //Do some tests on which node to eliminate when branching (e.g. simple heuristic like degree or so should do)
 
    constexpr bool neighbourHoodDisjunction = false;
    Node firstNode = focusToPreprocessed[best_it->node1];
@@ -374,8 +382,39 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    // Find column(s) with negative reduced cost in focusGraph
    bool solvedOptimally = false;
    assert(m_pricedVariables.empty());
-   {
-      // run a combinatorial algorithm
+
+   //First attempt to do so heuristically
+   bool doHeuristics = false;
+   if(doHeuristics){
+      AugmentingSearch search(dualWeights.weights(),m_focusGraph);
+      std::vector<DenseSet> solutions =
+          search.repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByWeight>(dualWeights.getOne());
+      //TODO: seems to be slower to do the following, test.
+//      if(solutions.empty()){
+//         auto sols = search.
+//                     repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::BySurplus>(dualWeights.getOne(),!solutions.empty());
+//         solutions.insert(solutions.end(),sols.begin(),sols.end());
+//      }
+      for(const auto& sol : solutions){
+         DenseSet preprocessedSol(m_completeFocusGraph.numNodes());
+         m_mapToPreprocessed.newToOldIDs.transform(sol,preprocessedSol);
+         maximizeStableSet(preprocessedSol,m_completeFocusGraph);
+         bool duplicate = false;
+         for(const auto& other_sol : m_pricedVariables){
+            if(other_sol == preprocessedSol){
+               duplicate = true;
+               break;
+            }
+         }
+         if(!duplicate){
+            m_pricedVariables.push_back(preprocessedSol);
+         }
+      }
+   }
+
+   //then exactly
+   if(m_pricedVariables.empty() && (!duringDiving || (duringDiving && !doHeuristics))){
+      // run an exact combinatorial algorithm
       // TODO: refactor a bit.
       auto lambda = [](const DenseSet &current_nodes, SafeWeight weight,
                        void *user_data, bool first_solution, bool &stop_solving,
@@ -393,7 +432,10 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       m_mwssSolver->setLowerBound(dualWeights.getOne());
       m_mwssSolver->setInfiniteUpperBound();
       m_mwssSolver->setTimeLimitCheckInterval(10'000);
-      m_mwssSolver->setTimeLimit(std::chrono::seconds(3'600)); // TODO:
+      m_mwssSolver->setTimeLimit(std::chrono::seconds(3'600)); // TODO: fix
+      if(duringDiving){
+         m_mwssSolver->setNodeLimit(10*m_focusGraph.numNodes()); //TODO: fix
+      }
       m_mwssSolver->setUserData(this);
       m_mwssSolver->setCallback(lambda);
       m_colorSolver = &t_solData;
@@ -429,23 +471,21 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       }
    }
    m_pricedVariables.clear();
-   if (solvedOptimally) {
-      if (newSets.empty()) {
-
-         if(!duringDiving){
-            SafeDualWeights::weight_type weightSum = dualWeights.fullCost();
-            RoundingMode mode = fegetround();
-            fesetround(FE_DOWNWARD);
-            double safeLowerBound = weightSum;
-            safeLowerBound /= dualWeights.scale();
-            fesetround(mode);
-            assert(m_lpSolver.objective() >= safeLowerBound);
-            node.updateLowerBound(safeLowerBound);
-         }
-         return PricingResult::NO_COLUMNS;
+   if (newSets.empty()) {
+      if (!duringDiving && solvedOptimally) {
+         SafeDualWeights::weight_type weightSum = dualWeights.fullCost();
+         RoundingMode mode = fegetround();
+         fesetround(FE_DOWNWARD);
+         double safeLowerBound = weightSum;
+         safeLowerBound /= dualWeights.scale();
+         fesetround(mode);
+         assert(m_lpSolver.objective() >= safeLowerBound);
+         node.updateLowerBound(safeLowerBound);
       }
+      return PricingResult::NO_COLUMNS;
    }
-   if(!duringDiving){
+
+   if(!duringDiving && solvedOptimally){
       RoundingMode mode = fegetround();
       fesetround(FE_UPWARD);
       double pricingProblemUB =
@@ -653,6 +693,8 @@ ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring,
 void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
                                      SolutionData &t_solData) {
    // Add the columns to the LP
+   // Adding all columns at once actually turns out to be slower, as we typically only add a few columns during pricing.
+   // Thus, we add one column at a time.
    const NodeMap& mapToFocussed = m_mapToPreprocessed.oldToNewIDs;
    for (const auto &set : sets) {
       ColVector colRows;
@@ -663,10 +705,9 @@ void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
             colRows.emplace_back(node, 1.0);
          }
       }
-      // TODO: add all columns at once in soplex (more efficient)
       m_lpSolver.addColumn(
           colRows, 1.0, 0.0,
-          soplex::infinity); // TODO: infinity/weak upper bound here
+          soplex::infinity); // TODO: upper bound option
    }
    assert(t_solData.variables().size() == m_lpSolver.numCols());
 }
@@ -683,6 +724,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       return;
    }
 
+//   m_lpSolver.setIntegralityPolishing(true);
    //std::cout<<"starting diving!\n";
    const int pricing_frequency = t_solData.settings().divingPricingFrequency();
    bool doColumnGeneration = (pricing_frequency == 0 && depth == 0) ||
@@ -705,7 +747,8 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       auto best_it = sol.end();
       double best_score = - std::numeric_limits<double>::infinity();
       for(auto it = sol.begin(); it != sol.end(); ++it){
-         if(it->value == 0.0 || it->value == 1.0){ //TODO: fix numerical tolerances here
+         if(t_solData.settings().isFeasZero(it->value)
+             || t_solData.settings().isFeasOne(it->value)){
             continue;
          }
          varSet.clear();
@@ -738,7 +781,6 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       }
 
       if(doColumnGeneration){
-         //TODO: ensure that we do not waste time proving optimality when diving for pricing
          pricingLoop(t_node,t_solData,true);
          if(m_lpSolver.objective() >= cutoffLimit){
             break;
@@ -772,7 +814,6 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
    }
 
 
-   //TODO: also set LP integrality information for soplex when diving, and possibly 'polish' the LP basis
    //reset the LP to where it was; remove cutoff bound and reset upper bounds which were fixed to zero
    for(const auto& index : fixedUpperBoundVars){
       m_lpSolver.changeBounds(index,0.0,soplex::infinity);
@@ -780,8 +821,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
    if(!doColumnGeneration){
       m_lpSolver.setObjectiveUpperLimit(soplex::infinity);
    }
-   //TODO: ensure basis is saved somewhere sensible for branching; now we destroy the basis information
-
+//   m_lpSolver.setIntegralityPolishing(false);
 }
 void ColorNodeWorker::processNextNode(SolutionData &t_solData) {
    //TODO: somehow refactor to have cleaner interface for updating the global solution data and this needing to be done less often.
@@ -813,6 +853,9 @@ void ColorNodeWorker::writeNodeStatistics(BBNode& t_node, SolutionData &t_data) 
 
 }
 bool ColorNodeWorker::solveLP() {
+   //Before every solve, we update the integrality information
+   m_lpSolver.markAllColumnsIntegral();
+
    bool status = m_lpSolver.solve();
    m_numLPIterations += m_lpSolver.numIterations();
    return status;

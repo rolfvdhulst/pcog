@@ -2,6 +2,8 @@
 // Created by rolf on 6-12-22.
 //
 
+#include <utility>
+
 #include "pcog/BBNode.hpp"
 #include "pcog/ColorNodeWorker.hpp"
 namespace pcog {
@@ -100,13 +102,13 @@ void BBTree::createNode(const BBNode &t_parentNode, ColorNodeWorker &t_nodeWorke
       pos = m_nodes.size();
       m_nodes.emplace_back(pos, t_parentNode.id(), t_parentNode.depth()+1,
                            t_parentNode.fractionalLowerBound(),
-                           t_parentNode.lowerBound(), branchingPath,t_nodeWorker.basis(),t_nodeWorker.mapToFocus());
+                           t_parentNode.lowerBound(), branchingPath,t_parentNode.basis(),t_nodeWorker.mapToFocus());
    }else{
       pos = m_freeSlots.top();
       m_freeSlots.pop();
       m_nodes[pos] = BBNode(pos, t_parentNode.id(), t_parentNode.depth()+1,
                             t_parentNode.fractionalLowerBound(),
-                            t_parentNode.lowerBound(), branchingPath,t_nodeWorker.basis(),t_nodeWorker.mapToFocus());
+                            t_parentNode.lowerBound(), branchingPath,t_parentNode.basis(),t_nodeWorker.mapToFocus());
    }
    ++m_totalNodes;
    addToTrees(pos);
@@ -123,4 +125,7 @@ void BBTree::removeFromTrees(node_id t_nodeId) {
 }
 LPBasis BBNode::basis() const { return m_initialBasis; }
 std::size_t BBNode::getNumAddedBranchingDecisions() const { return m_numAddedBranchingDecisions; }
+void BBNode::setBasis(LPBasis basis) {
+   m_initialBasis = std::move(basis);
+}
 } // namespace pcog

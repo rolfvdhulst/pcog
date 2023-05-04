@@ -104,6 +104,8 @@ set(sources
         include/pcog/utilities/RbTree.hpp
         src/Settings.cpp
         include/pcog/Settings.hpp
+        src/mwss/AugmentingSearch.cpp
+        include/pcog/mwss/AugmentingSearch.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

@@ -160,6 +160,14 @@ void LPSolver::changeBounds(ColIdx col, double lb, double ub) {
 std::size_t LPSolver::numIterations() const{
    return static_cast<size_t>(m_soplex.numIterations());
 }
+void LPSolver::markAllColumnsIntegral() {
+   std::vector<int> info(m_soplex.numCols(),1);
+   m_soplex.setIntegralityInformation(m_soplex.numCols(),info.data());
+}
+void LPSolver::setIntegralityPolishing(bool polishing) {
+   int value = polishing ? soplex::SoPlexBase<double>::POLISHING_INTEGRALITY : soplex::SoPlexBase<double>::POLISHING_OFF;
+   m_soplex.setIntParam(soplex::SoPlexBase<double>::SOLUTION_POLISHING,value);
+}
 
 void LPSolver::removeRows(std::vector<int>& permutation){
    m_soplex.removeRowsReal(permutation.data());

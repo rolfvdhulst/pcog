@@ -60,12 +60,17 @@ class LPSolver {
 
    void addColumns(const std::vector<ColVector>& t_columnElements, std::vector<double> objective,
                    std::vector<double> t_lowerBound, std::vector<double> t_upperBound);
+   void markAllColumnsIntegral();
+   void setIntegralityPolishing(bool polishing);
+
+
    /// Solves the linear program
    /// \return true if solved successfully, false if some error occurred.
    bool solve();
 
    void changeBounds(ColIdx col, double lb, double ub);
    void setObjectiveUpperLimit(double limit);
+
    //Following functions are unfortunately not const because of SoPlex
    /// Gets the dual solution vector of the solved LP
    /// \return

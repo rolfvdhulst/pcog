@@ -82,7 +82,10 @@ class BBNode {
       return true;
    }
    [[nodiscard]] LPBasis basis() const;
-   [[nodiscard]] NodeMap previousNodeMap() const { return m_previousNodeMap; }
+
+   void setBasis(LPBasis basis);
+   [[nodiscard]] NodeMap previousNodeMap() const {return m_previousNodeMap;}
+
 
    RbTreeLinks<int64_t> &getLowerLinks() { return m_lowerLinks; }
    [[nodiscard]] const RbTreeLinks<int64_t> &getLowerLinks() const { return m_lowerLinks; }
