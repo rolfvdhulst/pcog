@@ -27,6 +27,18 @@ constructBranchedGraphs(const DenseGraph &graph,
 DenseGraph
 constructBranchedFullGraph(const DenseGraph &graph,
                            const std::vector<BranchData> &branch_information);
+
+DenseGraph
+constructBranchedFullGraphFromChild(const DenseGraph& t_fullChildGraph,
+                                    const std::vector<BranchData>& branch_information,
+                                    std::size_t numNewBranchingConstraints);
+
+PreprocessingResult preprocessedGraphFromChild(const DenseGraph& t_preprocessedChildGraph,
+                                               const std::vector<BranchData>& branch_information,
+                                               std::size_t numNewBranchingConstraints,
+                                               const NodeMap& preprocessedToChildMap,
+                                               std::size_t coloring_bound);
+
 ///
 /// Method which constructs the current graph given a set of branching
 /// decisions. Also performs preprocessing again to make pricing as efficient as

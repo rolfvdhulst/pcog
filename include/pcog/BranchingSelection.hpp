@@ -41,6 +41,7 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
                               BranchingStrategy strategy,
                               const DenseGraph &graph,
                               LPSolver& t_lpSolver,
+                              const NodeMap& t_nodeToLPRow,
                               const std::vector<StableSetVariable>& variables,
                               const NodeMap& mapToPreprocessed,
                               std::size_t numPreprocessedNodes);
@@ -53,9 +54,12 @@ void scoreHeldsRule(std::vector<ScoredEdge> &candidates,
                     const NodeMap& mapToPreprocessed);
 
 void scoreDualMaximization(std::vector<ScoredEdge> &t_candidates,
-                           const RowVector & t_dualValues);
+                           const RowVector & t_dualValues,
+                           const NodeMap & t_nodeToLPRow);
 void scoreDualMinimization(std::vector<ScoredEdge> &t_candidates,
-                           const RowVector & t_dualValues);
+                           const RowVector & t_dualValues,
+                           const NodeMap& t_nodeToLPRow
+                           );
 
 void scoreRemovalSize(std::vector<ScoredEdge> &candidates,
                       const RowVector & lpSolution,

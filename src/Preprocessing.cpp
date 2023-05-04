@@ -160,6 +160,30 @@ void PreprocessedMap::clear() {
    newToOldIDs.clear();
    oldToNewIDs.clear();
 }
+void PreprocessedMap::extend(const PreprocessedMap &t_map) {
+   //change the id's of the map which extends this
+    std::vector<PreprocessedNode> newly_removed_nodes = t_map.removed_nodes;
+    for(auto& node : newly_removed_nodes){
+      std::size_t oldRemoved = newToOldIDs[node.removedNode()];
+      std::size_t oldDominated = node.dominatingNode() == INVALID_NODE ? INVALID_NODE : newToOldIDs[node.dominatingNode()];
+      node = PreprocessedNode(oldRemoved,node.removedReason(),oldDominated);
+    }
+    removed_nodes.insert(removed_nodes.end(),
+                         newly_removed_nodes.begin(),newly_removed_nodes.end());
+    //update the old->new and new->old mappings
+    NodeMap newToOld = NodeMap::identity(t_map.newToOldIDs.size());
+    for(std::size_t i = 0; i < t_map.newToOldIDs.size(); ++i){
+      newToOld[i] = newToOldIDs[t_map.newToOldIDs[i]];
+    }
+    newToOldIDs = newToOld;
+
+    for(std::size_t i = 0; i < oldToNewIDs.size(); ++i){
+      std::size_t childID = oldToNewIDs[i];
+      if(childID != INVALID_NODE){
+         oldToNewIDs[i] = t_map.oldToNewIDs[oldToNewIDs[i]];
+      }
+    }
+}
 
 std::vector<PreprocessedNode> removeLowDegreeVertices(const DenseGraph &graph,
                                                       DenseSet &present_nodes,

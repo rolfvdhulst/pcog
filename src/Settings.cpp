@@ -13,5 +13,5 @@ Settings::Settings() : m_node_limit{std::numeric_limits<std::size_t>::max()},
              m_rounding_tolerance{1e-8},
              m_diving_frequency{0},
              m_diving_pricing_frequency{0},
-             m_nodeDisplayFrequency{50}
+             m_nodeDisplayFrequency{500}
              {};

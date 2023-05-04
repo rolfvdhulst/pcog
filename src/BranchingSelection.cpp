@@ -43,6 +43,7 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
                               BranchingStrategy strategy,
                               const DenseGraph &graph,
                               LPSolver& t_lpSolver,
+                              const NodeMap& t_nodeToLPRow,
                               const std::vector<StableSetVariable>& variables,
                               const NodeMap& mapToPreprocessed,
                               std::size_t numPreprocessedNodes
@@ -107,13 +108,13 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
       return;
    case BranchingStrategy::DUAL_MAX:{
       auto dualValues = t_lpSolver.getDualSolution();
-      scoreDualMaximization(candidates,dualValues);
+      scoreDualMaximization(candidates,dualValues,t_nodeToLPRow);
       return;
    }
 
    case BranchingStrategy::DUAL_MIN:{
       auto dualValues = t_lpSolver.getDualSolution();
-      scoreDualMinimization(candidates,dualValues);
+      scoreDualMinimization(candidates,dualValues,t_nodeToLPRow);
       return;
    }
 
@@ -209,16 +210,18 @@ void scoreHeldsRule(std::vector<ScoredEdge> &candidates,
 }
 
 void scoreDualMaximization(std::vector<ScoredEdge> &t_candidates,
-                           const RowVector& t_dualValues) {
+                           const RowVector& t_dualValues,
+                           const NodeMap& t_nodeToLPRow) {
    for (auto &candidate : t_candidates) {
-      double dual_sum = t_dualValues[candidate.node1].value + t_dualValues[candidate.node2].value;
+      double dual_sum = t_dualValues[t_nodeToLPRow[candidate.node1]].value + t_dualValues[t_nodeToLPRow[candidate.node2]].value;
       candidate.score = dual_sum;
    }
 }
 void scoreDualMinimization(std::vector<ScoredEdge> &t_candidates,
-                           const RowVector& t_dualValues) {
+                           const RowVector& t_dualValues,
+                           const NodeMap& t_nodeToLPRow) {
    for (auto &candidate : t_candidates) {
-      double dual_sum = t_dualValues[candidate.node1].value + t_dualValues[candidate.node2].value;
+      double dual_sum = t_dualValues[t_nodeToLPRow[candidate.node1]].value + t_dualValues[t_nodeToLPRow[candidate.node2]].value;
       candidate.score = -dual_sum;
    }
 }

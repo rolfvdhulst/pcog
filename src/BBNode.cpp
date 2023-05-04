@@ -45,7 +45,8 @@ void BBTree::createRootNode(std::size_t numRootGraphNodes) {
 
    m_nodes.emplace_back(0, INVALID_BB_NODE, 0, 0.0, 0,
                             std::vector<BranchData>{BranchData(
-                                INVALID_NODE, INVALID_NODE, BranchType::ROOT)},LPBasis(),NodeMap::identity(numRootGraphNodes));
+                                INVALID_NODE, INVALID_NODE, BranchType::ROOT)},1
+                        ,LPBasis(),NodeMap::identity(numRootGraphNodes));
    m_totalNodes = 1;
    addToTrees(0);
 }
@@ -100,15 +101,17 @@ void BBTree::createNode(const BBNode &t_parentNode, ColorNodeWorker &t_nodeWorke
    branchingPath.insert(branchingPath.end(),t_addedBranchinDecisions.begin(),t_addedBranchinDecisions.end());
    if(m_freeSlots.empty()){
       pos = m_nodes.size();
-      m_nodes.emplace_back(pos, t_parentNode.id(), t_parentNode.depth()+1,
+      m_nodes.emplace_back(m_totalNodes, t_parentNode.id(), t_parentNode.depth()+1,
                            t_parentNode.fractionalLowerBound(),
-                           t_parentNode.lowerBound(), branchingPath,t_parentNode.basis(),t_nodeWorker.mapToFocus());
+                           t_parentNode.lowerBound(), branchingPath, t_addedBranchinDecisions.size(),
+                           t_parentNode.basis(),t_nodeWorker.mapToFocus());
    }else{
       pos = m_freeSlots.top();
       m_freeSlots.pop();
-      m_nodes[pos] = BBNode(pos, t_parentNode.id(), t_parentNode.depth()+1,
+      m_nodes[pos] = BBNode(m_totalNodes, t_parentNode.id(), t_parentNode.depth()+1,
                             t_parentNode.fractionalLowerBound(),
-                            t_parentNode.lowerBound(), branchingPath,t_parentNode.basis(),t_nodeWorker.mapToFocus());
+                            t_parentNode.lowerBound(), branchingPath,t_addedBranchinDecisions.size(),
+                            t_parentNode.basis(),t_nodeWorker.mapToFocus());
    }
    ++m_totalNodes;
    addToTrees(pos);

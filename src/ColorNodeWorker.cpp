@@ -15,10 +15,8 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
    resetNodeStatistics();
 
    // Node preprocessing to compute focus graph and complete focus graph
-   setupGraphs(t_node, t_solData);
-   // Set up LP representation
-   setupLP(t_node, t_solData);
-   m_focusNode = t_node.id();
+   setupNode(t_node,t_solData);
+
    // Solve lp
    solveLP();
    // Farkas pricing: price in new columns until lp solution is feasible
@@ -43,122 +41,7 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
 
    writeNodeStatistics(t_node,t_solData);
 }
-void ColorNodeWorker::setupGraphs(BBNode &node, const SolutionData &solver) {
 
-   if (node.branchDecisions().size() == 1) {
-      // For the root node; simply copy
-      m_completeFocusGraph = solver.preprocessedGraph();
-      m_focusGraph = solver.preprocessedGraph();
-      m_mapToPreprocessed =
-          PreprocessedMap({}, NodeMap::identity(m_focusGraph.numNodes()),
-                          NodeMap::identity(m_focusGraph.numNodes()));
-   } else {
-      // Perform node preprocessing
-      auto [completeGraph, result] =
-          constructBranchedGraphs(solver.preprocessedGraph(),
-                                  node.branchDecisions(), node.lowerBound());
-      m_completeFocusGraph = completeGraph;
-      m_focusGraph = result.graph;
-      m_mapToPreprocessed = result.map;
-   }
-}
-void ColorNodeWorker::setupLP(BBNode &bb_node, const SolutionData &t_solData) {
-   if(bb_node.depth() != 0 && bb_node.parent() == m_focusNode){
-      //TODO: check if this actually saves any time at all
-
-      if(m_focusGraph.numNodes() != m_lpSolver.numRows()){
-         assert(m_focusGraph.numNodes() < m_lpSolver.numRows());
-
-         std::vector<int> permutation;
-         m_lpSolver.removeRows(permutation);
-         //Save permutation of rows
-
-      }
-      //TODO: Check if row removal 'preserves' basis
-
-      auto decisions = bb_node.branchDecisions();
-      std::size_t numDecisions = decisions.size();
-      std::size_t numAdded = bb_node.getNumAddedBranchingDecisions();
-
-      auto bounds = m_lpSolver.columnUpperBounds();
-      const auto& variables = t_solData.variables();
-      assert(bounds.size() == variables.size());
-      //Fix variables to zero for columns which do not fit the current subproblem
-      for(std::size_t j = 0; j < bounds.size(); ++j){
-         if(bounds[j].value == 0.0) continue;
-         const auto &set = variables[j].set();
-         for(std::size_t i = numDecisions-numAdded; i < numDecisions; ++i){
-            const auto& decision = decisions[i];
-            if ((decision.type == BranchType::DIFFER &&
-                 set.contains(decision.first) && set.contains(decision.second)) ||
-                (decision.type == BranchType::SAME &&
-                 (set.contains(decision.first) !=
-                  set.contains(decision.second)))) {
-               //set upper bound to zero. We do this one at a time (and not all at once), so that SoPlex might be better able to preserve basis information
-               m_lpSolver.changeBounds(j,0.0,0.0);
-               break;
-            }
-         }
-      }
-      return;
-   }
-   // TODO: adjust method below so that the lp is not reinitialized from scratch
-   // every time
-   m_lpSolver.clear();
-
-   m_lpSolver.setIntegralityPolishing(true);
-   m_lpSolver.setObjectiveSense(ObjectiveSense::MINIMIZE);
-   for (Node vertex = 0; vertex < m_mapToPreprocessed.newToOldIDs.size();
-        ++vertex) {
-      m_lpSolver.addRow({}, 1.0, std::nullopt);
-   }
-   assert(m_lpSolver.numRows() == m_focusGraph.numNodes());
-   std::vector<std::vector<ColElem>> entries;
-   std::vector<double> objectives;
-   std::vector<double> lbs;
-   std::vector<double> ubs;
-   for (const auto &variable : t_solData.variables()) {
-      std::vector<ColElem> columnEntries;
-      for (const auto &node : variable.set()) {
-         auto index = m_mapToPreprocessed
-                          .oldToNewIDs[node]; // TODO: check if there is not a
-                                              // 'double mapping' here
-         if (index != INVALID_NODE) {
-            columnEntries.push_back(
-                ColElem(index, 1.0));
-         }
-      }
-
-      // Fix variables to zero from ryan-foster branching
-      double upperBound = soplex::infinity; // TODO: experiment with finite upper bound
-      const auto &set = variable.set();
-      for (const auto &decision : bb_node.branchDecisions()) {
-         // Check if the stable set is viable in the Subproblem
-         if ((decision.type == BranchType::DIFFER &&
-              set.contains(decision.first) && set.contains(decision.second)) ||
-             (decision.type == BranchType::SAME &&
-              (set.contains(decision.first) !=
-               set.contains(decision.second)))) {
-            upperBound = 0.0;
-            break;
-         }
-      }
-      entries.push_back(columnEntries);
-      objectives.push_back(1.0);
-      lbs.push_back(0.0);
-      ubs.push_back(upperBound);
-   }
-   m_lpSolver.addColumns(entries,objectives,lbs,ubs);
-
-   //set up LP Basis:
-   if(bb_node.depth() != 0){
-      LPBasis basis = bb_node.basis();
-      NodeMap previousMapping = bb_node.previousNodeMap();
-      fixLPBasis(basis,previousMapping);
-      m_lpSolver.setBasis(basis);
-   }
-
-}
 void ColorNodeWorker::farkasPricing(BBNode &t_node, SolutionData &t_solData) {
    assert(m_lpSolver.status() == LPSolverStatus::INFEASIBLE);
    const auto &stable_sets = t_solData.variables();
@@ -191,6 +74,7 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node, SolutionData &t_solData) {
    }
    DenseSet uncolored_nodes = colored_nodes;
    uncolored_nodes.complement();
+   assert(uncolored_nodes.any());
 
    DenseSet reduced_uncolored_nodes(m_focusGraph.numNodes());
    m_mapToPreprocessed.oldToNewIDs.transform(uncolored_nodes,
@@ -283,7 +167,8 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    //Score them according to some function
    scoreBranchingCandidates(
        scoredEdges, t_solData.settings().branchingStrategy(), m_focusGraph,
-       m_lpSolver,t_solData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
+       m_lpSolver, m_nodeToLPRow,
+       t_solData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
    std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
    std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
@@ -362,7 +247,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    auto dual_values = m_lpSolver.getDualSolution();
    std::vector<double> dualSolution(m_focusGraph.numNodes(), 0.0);
    for (const auto &row : dual_values) {
-      dualSolution[row.column] = row.value;
+      dualSolution[m_LPRowToNode[row.column]] = row.value;
    }
 //  if(!duringDiving){
 //         double dualSum = std::accumulate(dualSolution.begin(), dualSolution.end(), 0.0);
@@ -413,7 +298,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    }
 
    //then exactly
-   if(m_pricedVariables.empty() && (!duringDiving || (duringDiving && !doHeuristics))){
+   if(m_pricedVariables.empty() && (!duringDiving || !doHeuristics)){
       // run an exact combinatorial algorithm
       // TODO: refactor a bit.
       auto lambda = [](const DenseSet &current_nodes, SafeWeight weight,
@@ -656,8 +541,7 @@ void ColorNodeWorker::fixLPBasis(LPBasis &basis,
       basis.rowStatus[i] = originalNodeStatus[m_mapToPreprocessed.newToOldIDs[i]];
    }
 
-   //fix (extra) columns
-
+   //fix (extra) columns to zero initially
    std::size_t previousSize = basis.colStatus.size();
    std::size_t nextSize = m_lpSolver.numCols();
    if(previousSize < nextSize){
@@ -859,6 +743,188 @@ bool ColorNodeWorker::solveLP() {
    bool status = m_lpSolver.solve();
    m_numLPIterations += m_lpSolver.numIterations();
    return status;
+}
+void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node,
+                                         const SolutionData &t_solData) {
+   m_lpSolver.clear();
+
+   m_lpSolver.setIntegralityPolishing(true);
+   m_lpSolver.setObjectiveSense(ObjectiveSense::MINIMIZE);
+   for (Node vertex = 0; vertex < m_mapToPreprocessed.newToOldIDs.size();
+        ++vertex) {
+      m_lpSolver.addRow({}, 1.0, std::nullopt);
+   }
+   m_nodeToLPRow = NodeMap::identity(m_focusGraph.numNodes());
+   m_LPRowToNode = NodeMap::identity(m_focusGraph.numNodes());
+
+   assert(m_lpSolver.numRows() == m_focusGraph.numNodes());
+   std::vector<std::vector<ColElem>> entries;
+   std::vector<double> objectives;
+   std::vector<double> lbs;
+   std::vector<double> ubs;
+   for (const auto &variable : t_solData.variables()) {
+      std::vector<ColElem> columnEntries;
+      for (const auto &node : variable.set()) {
+         auto index = m_mapToPreprocessed
+                          .oldToNewIDs[node]; // TODO: check if there is not a
+                                              // 'double mapping' here
+         if (index != INVALID_NODE) {
+            columnEntries.push_back(
+                ColElem(index, 1.0));
+         }
+      }
+
+      // Fix variables to zero from ryan-foster branching
+      double upperBound = soplex::infinity; // TODO: experiment with finite upper bound
+      const auto &set = variable.set();
+      if(!m_completeFocusGraph.setIsStable(set)){
+         upperBound = 0.0;
+      }
+      //TODO: below doesn't work, probably because of SAME constraints
+//      for (const auto &decision : bb_node.branchDecisions()) {
+//         // Check if the stable set is viable in the Subproblem
+//         if ((decision.type == BranchType::DIFFER &&
+//              set.contains(decision.first) && set.contains(decision.second)) ||
+//             (decision.type == BranchType::SAME &&
+//              (set.contains(decision.first) !=
+//               set.contains(decision.second)))) {
+//            upperBound = 0.0;
+//            break;
+//         }
+//      }
+      entries.push_back(columnEntries);
+      objectives.push_back(1.0);
+      lbs.push_back(0.0);
+      ubs.push_back(upperBound);
+   }
+   m_lpSolver.addColumns(entries,objectives,lbs,ubs);
+
+   //set up LP Basis:
+   if(bb_node.depth() != 0){
+      LPBasis basis = bb_node.basis();
+      NodeMap previousMapping = bb_node.previousNodeMap();
+      fixLPBasis(basis,previousMapping);
+      m_lpSolver.setBasis(basis);
+   }
+}
+void ColorNodeWorker::setupNode(BBNode &node, const SolutionData &solver) {
+   if(node.depth() == 0){
+      // For the root node; simply copy
+      m_completeFocusGraph = solver.preprocessedGraph();
+      m_focusGraph = solver.preprocessedGraph();
+      m_mapToPreprocessed =
+          PreprocessedMap({}, NodeMap::identity(m_focusGraph.numNodes()),
+                          NodeMap::identity(m_focusGraph.numNodes()));
+      setupLPFromScratch(node,solver);
+   }else if(node.parent() == m_focusNode ){
+      //We can more efficiently initialize child nodes, as we already have
+      //the graphs and the LP in memory which are 'almost' correct,
+      //which means we can skip some work
+
+      auto completeGraph =
+          constructBranchedFullGraphFromChild(m_completeFocusGraph,
+                                              node.branchDecisions(),
+                                              node.getNumAddedBranchingDecisions());
+      m_completeFocusGraph = completeGraph;
+      auto result = preprocessedGraphFromChild(m_focusGraph,
+                                               node.branchDecisions(),
+                                               node.getNumAddedBranchingDecisions(),
+                                               m_mapToPreprocessed.oldToNewIDs,
+                                               node.lowerBound());
+
+      m_focusGraph = result.graph;
+      m_mapToPreprocessed.extend(result.map);
+      //setupLPFromScratch(node,solver);
+      setupChildLP(node,solver,result.map);
+   }else{
+      // When not a child node, we do not bother with a scheme to attempt to 'rollback' changes;
+      // this is likely to be more pain than it is worth
+
+      // Perform node preprocessing
+      auto [completeGraph, result] =
+          constructBranchedGraphs(solver.preprocessedGraph(),
+                                  node.branchDecisions(), node.lowerBound());
+      m_completeFocusGraph = completeGraph;
+      m_focusGraph = result.graph;
+      m_mapToPreprocessed = result.map;
+      setupLPFromScratch(node,solver);
+   }
+
+   m_focusNode = node.id();
+
+#ifndef NDEBUG
+   {
+      //Sanity check if the LP and the complete focus graph were constructed
+      //correctly
+
+       auto bounds = m_lpSolver.columnUpperBounds();
+
+       const auto& vars = solver.variables();
+       assert(bounds.size() == vars.size());
+       for(std::size_t i = 0; i < bounds.size(); ++i){
+         if(bounds[i].value == 0.0){
+            assert(!m_completeFocusGraph.setIsStable(vars[i].set()));
+         }else{
+            assert(m_completeFocusGraph.setIsStable(vars[i].set()));
+         }
+       }
+   };
+#endif
+}
+void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solData,
+                                  const PreprocessedMap& t_childMap) {
+   if(!t_childMap.removed_nodes.empty()){
+      assert(m_focusGraph.numNodes() < m_lpSolver.numRows());
+
+      std::vector<int> permutation(m_lpSolver.numRows(),0);
+      for(const auto& node : t_childMap.removed_nodes){
+         permutation[m_nodeToLPRow[node.removedNode()]] = -1;
+      }
+      auto previousMap = bb_node.previousNodeMap();
+      m_lpSolver.removeRows(permutation);
+      // permutation vector now gives old LP row to new LP row mapping e.g.
+      // perm[old_row ] returns the new row (note; terms of the OLD node indices)
+
+      NodeMap newNodeToLP = NodeMap::identity(m_focusGraph.numNodes());
+      for(std::size_t i = 0; i < m_focusGraph.numNodes(); ++i){
+         Node oldNode = t_childMap.newToOldIDs[i];
+         std::size_t oldRow = m_nodeToLPRow[oldNode];
+         std::size_t newRow = permutation[oldRow] ;
+         newNodeToLP[i] = newRow;
+      }
+
+      m_nodeToLPRow = newNodeToLP;
+      m_LPRowToNode = NodeMap::inverse(m_nodeToLPRow,m_lpSolver.numRows());
+      //Save permutation of rows
+   }
+   auto decisions = bb_node.branchDecisions();
+   std::size_t numDecisions = decisions.size();
+   std::size_t numAdded = bb_node.getNumAddedBranchingDecisions();
+
+   auto bounds = m_lpSolver.columnUpperBounds();
+   const auto& variables = t_solData.variables();
+   assert(bounds.size() == variables.size());
+   //Fix variables to zero for columns which do not fit the current subproblem
+   for(std::size_t j = 0; j < bounds.size(); ++j){
+      if(bounds[j].value == 0.0) continue;
+      const auto &set = variables[j].set();
+      if(!m_completeFocusGraph.setIsStable(set)){
+         m_lpSolver.changeBounds(j,0.0,0.0);
+      }
+      //TODO: below misses some columns, probably has to do with SAME
+//      for(std::size_t i = numDecisions-numAdded; i < numDecisions; ++i){
+//         const auto& decision = decisions[i];
+//         if ((decision.type == BranchType::DIFFER &&
+//              set.contains(decision.first) && set.contains(decision.second)) ||
+//             (decision.type == BranchType::SAME &&
+//              (set.contains(decision.first) !=
+//               set.contains(decision.second)))) {
+//            //set upper bound to zero. We do this one at a time (and not all at once), so that SoPlex might be better able to preserve basis information
+//            m_lpSolver.changeBounds(j,0.0,0.0);
+//            break;
+//         }
+//      }
+   }
 }
 
 } // namespace pcog

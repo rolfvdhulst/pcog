@@ -45,6 +45,8 @@ struct PreprocessedMap {
    PreprocessedMap(std::vector<PreprocessedNode> removed_nodes,
                    NodeMap newToOld, NodeMap oldToNew);
    void clear();
+
+   void extend(const PreprocessedMap& t_map);
    std::vector<PreprocessedNode> removed_nodes;
    NodeMap newToOldIDs;
    NodeMap oldToNewIDs;

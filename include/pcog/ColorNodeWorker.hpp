@@ -35,8 +35,10 @@ class ColorNodeWorker {
    void processNode(BBNode& node, SolutionData& t_solver);
 
    /// Performs 'node preprocessing', diminishing the size of the graphs
-   void setupGraphs(BBNode& node, const SolutionData& t_solver);
-   void setupLP(BBNode& node, const SolutionData& t_solver);
+
+   void setupNode(BBNode& node, const SolutionData& t_soLData);
+   void setupChildLP(BBNode& node, const SolutionData& t_solver, const PreprocessedMap& t_childMap);
+   void setupLPFromScratch(BBNode& node, const SolutionData& t_solver);
    void farkasPricing(BBNode& node, SolutionData& t_solver);
    void pricingLoop(BBNode& node, SolutionData& t_solver, bool duringDiving);
    void roundingHeuristic(BBNode& node, SolutionData& t_solver);
@@ -64,6 +66,9 @@ class ColorNodeWorker {
    DenseGraph m_focusGraph;
    DenseGraph m_completeFocusGraph;
    PreprocessedMap m_mapToPreprocessed;
+
+   NodeMap m_nodeToLPRow;
+   NodeMap m_LPRowToNode;
    bool solveLP();
 
    void resetNodeStatistics();
