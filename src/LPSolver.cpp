@@ -161,4 +161,8 @@ std::size_t LPSolver::numIterations() const{
    return static_cast<size_t>(m_soplex.numIterations());
 }
 
+void LPSolver::removeRows(std::vector<int>& permutation){
+   m_soplex.removeRowsReal(permutation.data());
+}
+
 } // namespace pcog

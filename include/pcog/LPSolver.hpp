@@ -95,6 +95,8 @@ class LPSolver {
    void setBasis(const LPBasis& basis);
 
    std::size_t numIterations() const;
+
+   void removeRows(std::vector<RowIdx>& permutation);
  private:
    soplex::SoPlex m_soplex;
 };

@@ -122,4 +122,5 @@ void BBTree::removeFromTrees(node_id t_nodeId) {
    m_freeSlots.push(t_nodeId);
 }
 LPBasis BBNode::basis() const { return m_initialBasis; }
+std::size_t BBNode::getNumAddedBranchingDecisions() const { return m_numAddedBranchingDecisions; }
 } // namespace pcog

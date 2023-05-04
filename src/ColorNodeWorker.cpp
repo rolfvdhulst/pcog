@@ -59,6 +59,45 @@ void ColorNodeWorker::setupGraphs(BBNode &node, const SolutionData &solver) {
    }
 }
 void ColorNodeWorker::setupLP(BBNode &bb_node, const SolutionData &t_solData) {
+   if(bb_node.depth() != 0 && bb_node.parent() == m_focusNode){
+      //TODO: check if this actually saves any time at all
+
+      if(m_focusGraph.numNodes() != m_lpSolver.numRows()){
+         assert(m_focusGraph.numNodes() < m_lpSolver.numRows());
+
+         std::vector<int> permutation;
+         m_lpSolver.removeRows(permutation);
+         //Save permutation of rows
+
+      }
+      //TODO: Check if row removal 'preserves' basis
+
+      auto decisions = bb_node.branchDecisions();
+      std::size_t numDecisions = decisions.size();
+      std::size_t numAdded = bb_node.getNumAddedBranchingDecisions();
+
+      auto bounds = m_lpSolver.columnUpperBounds();
+      const auto& variables = t_solData.variables();
+      assert(bounds.size() == variables.size());
+      //Fix variables to zero for columns which do not fit the current subproblem
+      for(std::size_t j = 0; j < bounds.size(); ++j){
+         if(bounds[j].value == 0.0) continue;
+         const auto &set = variables[j].set();
+         for(std::size_t i = numDecisions-numAdded; i < numDecisions; ++i){
+            const auto& decision = decisions[i];
+            if ((decision.type == BranchType::DIFFER &&
+                 set.contains(decision.first) && set.contains(decision.second)) ||
+                (decision.type == BranchType::SAME &&
+                 (set.contains(decision.first) !=
+                  set.contains(decision.second)))) {
+               //set upper bound to zero. We do this one at a time (and not all at once), so that SoPlex might be better able to preserve basis information
+               m_lpSolver.changeBounds(j,0.0,0.0);
+               break;
+            }
+         }
+      }
+      return;
+   }
    // TODO: adjust method below so that the lp is not reinitialized from scratch
    // every time
    m_lpSolver.clear();
@@ -249,7 +288,7 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
    //TODO: how to sort/choose between node1 /node2?
 
-   constexpr bool neighbourHoodDisjunction = true;
+   constexpr bool neighbourHoodDisjunction = false;
    Node firstNode = focusToPreprocessed[best_it->node1];
    Node secondNode = focusToPreprocessed[best_it->node2];
    node.setBranchingNodes(firstNode,secondNode);
