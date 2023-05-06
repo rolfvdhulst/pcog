@@ -301,7 +301,7 @@ preprocessBranchedGraph(const DenseGraph &t_graph,
    auto [newGraph, newToOld] = t_graph.nodeInducedSubgraph(present_nodes);
    NodeMap oldToNew = NodeMap::inverse(newToOld, t_graph.numNodes());
 
-   return {newGraph, PreprocessedMap(removed_nodes, newToOld, oldToNew)};
+   return {newGraph, PreprocessedMap(removed_nodes,{}, newToOld, oldToNew)};
 }
 
 
@@ -379,7 +379,7 @@ PreprocessingResult preprocessedGraphFromChild(const DenseGraph& t_preprocessedC
    auto [newGraph, newToOld] = updatedGraph.nodeInducedSubgraph(present_nodes);
    NodeMap oldToNew = NodeMap::inverse(newToOld, updatedGraph.numNodes());
 
-   return {newGraph, PreprocessedMap(removed_nodes, newToOld, oldToNew)};
+   return {newGraph, PreprocessedMap(removed_nodes,{}, newToOld, oldToNew)};
 }
 
 }

@@ -63,6 +63,8 @@ class DenseGraph {
    /// Counts the number of edges in the graph. Note this does NOT count self
    /// loops correctly! \return The number of edges in the graph
    [[nodiscard]] degree_type numEdges() const;
+   [[nodiscard]] double density() const;
+
    /// Gets the dense set of the neighbourhood of the given node
    /// \param t_node The node to get the neighbourhood for
    /// \return The neighbourhood of the node

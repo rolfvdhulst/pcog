@@ -46,13 +46,16 @@ class SolutionData {
 
    void addSolution(std::vector<std::size_t> t_stable_set_indices);
 
+   [[nodiscard]] std::size_t upperBoundUnscaled() const;
+   [[nodiscard]] std::size_t lowerBoundUnscaled() const;
+
    [[nodiscard]] std::size_t upperBound() const;
    [[nodiscard]] std::size_t lowerBound() const;
    [[nodiscard]] double fractionalLowerBound() const;
 
    //These functions should only be called either during (or before) processing of the root node,
    //or after a node has been solved and we evaluate the b&b tree
-   void updateLowerBound(std::size_t t_lb);
+   void updateLowerBound(std::size_t t_lb); //Note the lower bounds are wtihout the offset from the presolving of the root node!
    void updateFractionalLowerBound(double t_fractional_lb);
    void updateTreeBounds();
 

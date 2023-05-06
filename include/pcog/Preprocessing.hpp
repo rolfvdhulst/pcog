@@ -11,7 +11,7 @@
 
 namespace pcog {
 
-enum class PreprocessedReason { LOW_DEGREE, DOMINATED_NODE };
+enum class PreprocessedReason { LOW_DEGREE, DOMINATED_NODE, STABLE_NEIGHBOURHOOD };
 
 /// A class which holds a node which was removed during preprocessing
 class PreprocessedNode {
@@ -43,11 +43,13 @@ class PreprocessedNode {
 struct PreprocessedMap {
    PreprocessedMap() = default;
    PreprocessedMap(std::vector<PreprocessedNode> removed_nodes,
+                   std::vector<DenseSet> t_fixedSets,
                    NodeMap newToOld, NodeMap oldToNew);
    void clear();
 
    void extend(const PreprocessedMap& t_map);
    std::vector<PreprocessedNode> removed_nodes;
+   std::vector<DenseSet> fixed_sets; //Stable sets/ variables which were fixed because a node's neighbourhood is stable
    NodeMap newToOldIDs;
    NodeMap oldToNewIDs;
 };
@@ -109,6 +111,9 @@ removeLowDegreeVertices(const DenseGraph &graph, DenseSet &present_nodes,
 std::vector<PreprocessedNode>
 removeStrictlyDominatedVertices(const DenseGraph &graph,
                                 DenseSet &present_nodes);
+
+std::vector<DenseSet>
+fixStableNeighbourhoods(const DenseGraph &graph, DenseSet &present_nodes);
 
 NodeColoring extendColoring(const NodeColoring& coloring,
                             const PreprocessedMap &map,

@@ -87,7 +87,7 @@ void ColorSolver::branchAndBound() {
    m_statistics.m_branch_and_bound_time = std::chrono::duration<double>(time_end - time_start);
    // TODO: be careful with termination from time limit in processNode before
    // branching when only one node is left
-   m_status = m_solData.lowerBound() == m_solData.upperBound()
+   m_status = m_solData.lowerBoundUnscaled() == m_solData.upperBoundUnscaled()
                   ? SolverStatus::SOLVED_OPTIMALLY : SolverStatus::SOLVED_SUBOPTIMALLY ;
 }
 void ColorSolver::recordStatistics() {

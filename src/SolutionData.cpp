@@ -125,10 +125,14 @@ void SolutionData::addSolution(std::vector<std::size_t> t_stable_set_indices) {
    }
    m_colorings.emplace_back(std::move(t_stable_set_indices));
 }
-std::size_t SolutionData::upperBound() const { return m_upperBound; }
-std::size_t SolutionData::lowerBound() const { return m_lowerBound; }
+std::size_t SolutionData::lowerBoundUnscaled() const {return m_lowerBound;}
+std::size_t SolutionData::upperBoundUnscaled() const {return m_upperBound;}
+
+std::size_t SolutionData::upperBound() const { return m_upperBound + m_preprocessedToOriginal.fixed_sets.size(); }
+std::size_t SolutionData::lowerBound() const { return m_lowerBound + m_preprocessedToOriginal.fixed_sets.size(); }
 double SolutionData::fractionalLowerBound() const {
-   return m_fractionalLowerBound;
+   return m_fractionalLowerBound +
+          static_cast<double>(m_preprocessedToOriginal.fixed_sets.size());
 }
 bool SolutionData::isNewSet(const DenseSet &t_set) const {
    return std::all_of(m_variables.begin(), m_variables.end(),
@@ -204,9 +208,9 @@ void SolutionData::display(std::ostream& t_stream){
             << std::setw(7) << std::right<< memory <<" | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numProcessedNodes() << " | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numOpenNodes() << " | "
-            << std::fixed << std::setw(6) << std::setprecision(2) << std::right << m_fractionalLowerBound << " | "
-            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << m_lowerBound << " | "
-            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << m_upperBound << " | "
+            << std::fixed << std::setw(6) << std::setprecision(2) << std::right << fractionalLowerBound() << " | "
+            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << lowerBound() << " | "
+            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << upperBound() << " | "
             << std::scientific << std::setw(5) << std::setprecision(2) << std::right << m_variables.size() << " | "
             << std::scientific << std::setw(7) << std::setprecision(2) << std::right << itsToString(m_lpIterations) << " | "
             << std::scientific << std::setw(7) << std::setprecision(2) << std::right << itsToString(m_pricingIterations) << " | "
@@ -236,7 +240,11 @@ void SolutionData::doPresolve() {
    // preprocessing rule will not find anything unless some other rule finds a
    // reduction which lowers a node degree of the graph below the chromatic
    // number
+
+   std::cout<<"Original graph has " <<m_originalGraph.numNodes()<<" nodes, density: "<< m_originalGraph.density()*100.0<<"%\n";
    auto result = preprocessOriginalGraph(m_originalGraph);
+   std::cout<<"Presolved graph has "<<result.graph.numNodes()<<" nodes, density: "<< result.graph.density()*100.0<<"%\n";
+
    m_preprocessedGraph = result.graph;
    m_preprocessedToOriginal = result.map;
    // Also add coloring variables as initial solution

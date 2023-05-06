@@ -167,4 +167,11 @@ void DenseGraph::addEdges(Node node, const DenseSet &other_nodes) {
       m_adjacencyMatrix[other_node].add(node);
    }
 }
+double DenseGraph::density() const {
+   std::size_t nodes = numNodes();
+   if(nodes == 0 ) return 0.0;
+   double density = static_cast<double>(2*numEdges()) /
+                    static_cast<double>(nodes*(nodes-1));
+   return density;
+}
 } // namespace pcog

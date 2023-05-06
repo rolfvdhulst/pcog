@@ -152,7 +152,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
                                                const SolutionData &t_solData) {
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
-   if(node.lowerBound() >= t_solData.upperBound()){
+   if(node.lowerBound() >= t_solData.upperBoundUnscaled()){
       node.setStatus(BBNodeStatus::CUT_OFF);
       return;
    }
@@ -423,7 +423,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
          node.updateLowerBound(safeLowerBound);
       }
 
-      if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBound()){
+      if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBoundUnscaled()){
          writeNodeStatistics(node,t_solData);
       }
       return PricingResult::NO_COLUMNS;
@@ -445,7 +445,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    //Ensure we keep the solution data up to date if we improve the global lower bound (e.g. we are in the root node).
    //For now, the case where we are not in the root node but improve the global bound is handled by b&b code itself,
    //but here we need to notify the pricing system somehow
-   if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBound()){
+   if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBoundUnscaled()){
       writeNodeStatistics(node,t_solData);
    }
    addColumns(newSets, t_solData);
@@ -484,7 +484,7 @@ void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
 void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
 
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
-   double cutOffBound = static_cast<double>(t_solData.upperBound())-1.0;
+   double cutOffBound = static_cast<double>(t_solData.upperBoundUnscaled())-1.0;
    if(m_lpSolver.objective() >= cutOffBound + t_solData.settings().roundingTolerance()){
       return;
    }
@@ -531,7 +531,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
          projectedVar.projectedSet.inplaceDifference(removeSet);
       }
    }
-   if(uncoloredNodes.empty() && color_indices.size() < t_solData.upperBound()){
+   if(uncoloredNodes.empty() && color_indices.size() < t_solData.upperBoundUnscaled()){
       //project solution back to original graph; although the sets form a coloring for this graph after branching, we also want to solution
       //to be valid in the root node.
       DenseSet originalUncolored(m_completeFocusGraph.numNodes(),true);
@@ -662,7 +662,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       return;
    }
    //do not dive if we cannot find an incumbent anyways (TODO make setting for finding equivalent solutions for crossover)
-   double cutoffLimit = t_solData.upperBound()-1.0 + t_solData.settings().roundingTolerance();
+   double cutoffLimit = t_solData.upperBoundUnscaled()-1.0 + t_solData.settings().roundingTolerance();
    if(m_lpSolver.objective() > cutoffLimit){
       return;
    }
@@ -874,7 +874,7 @@ void ColorNodeWorker::setupNode(BBNode &node, const SolutionData &solver) {
       m_completeFocusGraph = solver.preprocessedGraph();
       m_focusGraph = solver.preprocessedGraph();
       m_mapToPreprocessed =
-          PreprocessedMap({}, NodeMap::identity(m_focusGraph.numNodes()),
+          PreprocessedMap({},{}, NodeMap::identity(m_focusGraph.numNodes()),
                           NodeMap::identity(m_focusGraph.numNodes()));
       setupLPFromScratch(node,solver);
    }else if(node.parent() == m_focusNode ){
