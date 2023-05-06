@@ -61,10 +61,20 @@ struct PreprocessingResult {
    PreprocessedMap map;
 };
 
+enum class CertificateType{
+   CLIQUE
+};
+struct LowerBoundCertificate{
+   DenseSet set;
+   std::size_t bound;
+   CertificateType type = CertificateType::CLIQUE;
+};
+
 /// Preprocess the original root node graph
 /// \param graph The graph to preprocess
 /// \return The preprocessing result with graph and map.
-PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph);
+std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOriginalGraph(const DenseGraph &graph,
+                                            std::size_t coloringUpperBound );
 
 /// Preprocess low degree vertices from the graph, given a clique which is not
 /// to be removed. This function modifies the present nodes, and only considers
@@ -75,8 +85,8 @@ PreprocessingResult preprocessOriginalGraph(const DenseGraph &graph);
 /// \param clique The clique to use for preprocessing
 /// \return A vector with the removed nodes
 std::vector<PreprocessedNode>
-removeLowDegreeVerticesClique(const DenseGraph &graph, DenseSet &present_nodes,
-                              const DenseSet &clique);
+removeLowDegreeVerticesSubgraph(const DenseGraph &graph, DenseSet &present_nodes,
+                              const DenseSet &clique, std::size_t lower_bound);
 
 /// Preprocess dominated vertices from the graph, given a clique which is not
 /// to be removed. This function modifies the present nodes, and only considers

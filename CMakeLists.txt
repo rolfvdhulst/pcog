@@ -106,6 +106,10 @@ set(sources
         include/pcog/Settings.hpp
         src/mwss/AugmentingSearch.cpp
         include/pcog/mwss/AugmentingSearch.hpp
+        src/GreedyColoring.cpp
+        include/pcog/GreedyColoring.hpp
+        src/TabuColoring.cpp
+        include/pcog/TabuColoring.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

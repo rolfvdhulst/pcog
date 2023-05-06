@@ -34,6 +34,7 @@ bool SetColoring::isValid(const DenseGraph &t_graph) const {
 void SetColoring::addColor(const DenseSet &t_set) { m_colors.push_back(t_set); }
 std::size_t SetColoring::numColors() const { return m_colors.size(); }
 const std::vector<DenseSet> &SetColoring::colors() const { return m_colors; }
+std::vector<DenseSet>& SetColoring::colors() {return m_colors; }
 
 NodeColoring::NodeColoring(std::size_t num_nodes, const SetColoring &coloring)
     : color(num_nodes, INVALID_COLOR), num_colors{coloring.m_colors.size()} {

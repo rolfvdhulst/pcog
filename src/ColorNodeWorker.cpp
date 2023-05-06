@@ -994,7 +994,7 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
    }
 }
 BBNode&& ColorNodeWorker::chooseNextNode(SolutionData &t_solData) {
-   if(!m_childNodes.empty() && m_successiveChildNodesProcessed != 100){
+   if(!m_childNodes.empty() && m_successiveChildNodesProcessed != 5){
       ++m_successiveChildNodesProcessed;
       //TODO: pick a node intelligently
       return t_solData.popNodeWithID(m_childNodes.back());

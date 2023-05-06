@@ -3,10 +3,13 @@
 //
 
 #include "pcog/SolutionData.hpp"
+#include "pcog/GreedyColoring.hpp"
+#include "pcog/StableSetMaximizer.hpp"
+#include "pcog/TabuColoring.hpp"
 
-#include <iostream>
-#include <iomanip>
 #include <array>
+#include <iomanip>
+#include <iostream>
 #include <utility>
 
 #ifdef __linux__
@@ -203,15 +206,20 @@ void SolutionData::display(std::ostream& t_stream){
    //TODO: fix almost all fields being written to (OR pass in solver struct data somehow)
 
 
+
    //TODO: ideally we would like to just use cout<< duration but it seems that this is not supported yet by all compilers
    t_stream << std::fixed << std::setw(7) << std::setprecision(1) << std::right << duration.count() << " | "
             << std::setw(7) << std::right<< memory <<" | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numProcessedNodes() << " | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numOpenNodes() << " | "
             << std::fixed << std::setw(6) << std::setprecision(2) << std::right << fractionalLowerBound() << " | "
-            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << lowerBound() << " | "
-            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << upperBound() << " | "
-            << std::scientific << std::setw(5) << std::setprecision(2) << std::right << m_variables.size() << " | "
+            << std::scientific << std::setw(6) << std::setprecision(2) << std::right << lowerBound() << " | ";
+   if(upperBound() == std::numeric_limits<std::size_t>::max()) {
+      t_stream << "    -  | ";
+   }else {
+      t_stream << std::scientific << std::setw(6) << std::setprecision(2) << std::right << upperBound() << " | ";
+   }
+   t_stream << std::scientific << std::setw(5) << std::setprecision(2) << std::right << m_variables.size() << " | "
             << std::scientific << std::setw(7) << std::setprecision(2) << std::right << itsToString(m_lpIterations) << " | "
             << std::scientific << std::setw(7) << std::setprecision(2) << std::right << itsToString(m_pricingIterations) << " | "
             << std::endl;
@@ -233,21 +241,76 @@ void SolutionData::startSolveTime() {
 }
 void SolutionData::doPresolve() {
    // TODO: find an initial coloring using a simple greedy method.
-
-   // This can help to judge if it's 'worth' to find a clique for the lower
-   // bound; If the minimal degree of the graph is larger than the chromatic
-   // number (which typically happens for dense graphs), then the low-degree
-   // preprocessing rule will not find anything unless some other rule finds a
-   // reduction which lowers a node degree of the graph below the chromatic
-   // number
+   GreedyColoring greedy(m_originalGraph);
+   auto coloring = greedy.run_saturation_degree();
+   std::cout<<"DSATUR found " << coloring.numColors()<<"-coloring\n";
 
    std::cout<<"Original graph has " <<m_originalGraph.numNodes()<<" nodes, density: "<< m_originalGraph.density()*100.0<<"%\n";
-   auto result = preprocessOriginalGraph(m_originalGraph);
+   auto [result,certificate] = preprocessOriginalGraph(m_originalGraph, coloring.numColors());
    std::cout<<"Presolved graph has "<<result.graph.numNodes()<<" nodes, density: "<< result.graph.density()*100.0<<"%\n";
 
    m_preprocessedGraph = result.graph;
    m_preprocessedToOriginal = result.map;
-   // Also add coloring variables as initial solution
+
+   //TODO: how to deal with fixing of certificate stable sets and resulting bound changes?
+   std::size_t lb = certificate.has_value() && result.map.fixed_sets.empty() ? certificate->bound : 0;
+
+
+   //Project coloring to preprocessed graph
+   SetColoring projectedColoring;
+   for(const auto& color : coloring.colors()) {
+      DenseSet set(m_preprocessedGraph.numNodes());
+      m_preprocessedToOriginal.oldToNewIDs.transform(color,set);
+      //TODO: maximize stable sets here?
+      if(!set.empty()) {
+         projectedColoring.addColor(set);
+      }
+   }
+   NodeColoring initialColoring(m_preprocessedGraph.numNodes(),projectedColoring);
+
+
+   //Run tabu search to find a better initial solution.
+   std::size_t numSearchColors = initialColoring.numColors()-1;
+   std::size_t lowerBound = 0;
+   NodeColoring searchColoring = initialColoring;
+   NodeColoring bestColoring = initialColoring;
+   TabuColoring tabuAlgorithm(m_preprocessedGraph);
+   while( lb <= numSearchColors) {
+      std::size_t removeColor = numSearchColors; //We remove the 'highest' color, but different strategies are possible
+      searchColoring.setNumColors(numSearchColors);
+      for(std::size_t i = 0; i < m_preprocessedGraph.numNodes(); ++i) {
+         if(searchColoring[i] == removeColor) {
+            searchColoring[i]--; // We set it to be the next color; again different strategies are possible.
+         }
+      }
+      auto foundColoring = tabuAlgorithm.run(searchColoring);
+      if(foundColoring.has_value()) {
+         searchColoring = foundColoring.value();
+         bestColoring = foundColoring.value();
+         std::cout<<"Tabu coloring found "<<bestColoring.numColors()<<"-coloring after "<<tabuAlgorithm.numIterations()<<" iterations\n";
+      }else {
+         break;
+      }
+      --numSearchColors;
+   }
+   //Add best coloring to the LP
+   StableSetMaximizer maximizer(42);
+   SetColoring bestSetColoring(bestColoring);
+   for(auto& color : bestSetColoring.colors()) {
+      maximizer.maximizeRandomly(color,m_preprocessedGraph);
+   }
+   std::vector<std::size_t> indices;
+   for(const auto& color : bestSetColoring.colors()) {
+      std::size_t index = addStableSet(color);
+      indices.push_back(index);
+   }
+
+   if(lb > 0) {
+      updateFractionalLowerBound(static_cast<double>(lb));
+      updateLowerBound(lb);
+   }
+   addSolution(indices);
+
 }
 bool SolutionData::checkNodeLimitHit() const {
    return m_tree.numProcessedNodes() >= m_settings.nodeLimit();
@@ -311,12 +374,25 @@ void SolutionData::updateTreeBounds() {
       updateLowerBound(m_tree.lowerBound());
    }else {
       //In case the node-queue is empty, we have proven that the lower and upper bounds are equal :)
-      updateFractionalLowerBound(m_upperBound);
-      updateLowerBound(m_upperBound);
+      updateFractionalLowerBound(static_cast<double>(upperBoundUnscaled()));
+      updateLowerBound(upperBoundUnscaled());
    }
 
 }
 BBNode &&SolutionData::popNodeWithID(node_id id) {
    return m_tree.popNodeWithID(id);
+}
+SetColoring SolutionData::incumbentUnscaled() const {
+   SetColoring coloring;
+   for(const auto& index : m_colorings[m_incumbent_index]) {
+      coloring.addColor(m_variables[index].set());
+   }
+   return coloring;
+}
+NodeColoring SolutionData::incumbent() const {
+   SetColoring preprocessedSol = incumbentUnscaled();
+   NodeColoring preprocessedCol(m_preprocessedGraph.numNodes(),preprocessedSol);
+   NodeColoring originalCol = extendColoring(preprocessedCol,m_preprocessedToOriginal,m_originalGraph);
+   return originalCol;
 }
 }// namespace pcog

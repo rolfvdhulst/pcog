@@ -36,6 +36,8 @@ class SetColoring {
    /// Returns a vector with the color classes
    /// \return
    [[nodiscard]] const std::vector<DenseSet>& colors() const;
+   std::vector<DenseSet>& colors();
+
    /// \return The number of colors in the current coloring
    [[nodiscard]] std::size_t numColors() const;
 

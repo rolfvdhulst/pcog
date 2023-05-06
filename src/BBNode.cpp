@@ -64,6 +64,8 @@ BBNode&& BBTree::popNodeWithID(node_id id){
    return std::move(m_nodes[id]);
 }
 void BBTree::pruneUpperBound(std::size_t numColors) {
+   //TODO: pruned nodes are counted as 'processed' nodes in b&b loop visualization. Fix
+
    //Iterate from largest to smallest lowerBound, pruning the nodes with too high lowerBounds away
    LowerRbTree rbTree(this);
    int64_t node = rbTree.upper_bound();

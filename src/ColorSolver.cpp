@@ -119,11 +119,19 @@ void ColorSolver::displayEndResult(std::ostream &t_stream) {
       break;
    }
    t_stream << "\n";
-   t_stream << std::fixed;
+   t_stream << std::defaultfloat <<std::setprecision(4);
    t_stream << "Solution time          : " << m_statistics.m_total_solve_time <<"\n";
    t_stream << "Branch-and-bound nodes : " << m_solData.numProcessedNodes() <<"\n";
    t_stream << "Lower bound            : " << m_solData.lowerBound()<<"\n";
-   t_stream << "Upper bound            : " << m_solData.upperBound()<<"\n"<<std::flush;
+   t_stream << "Upper bound            : " << m_solData.upperBound()<<"\n";
+   auto best = m_solData.incumbent();
+   t_stream << "Coloring (node,color)  : ";
+   for(Node node = 0; node < best.numNodes(); ++node){
+      t_stream<<"("<<node<<","<< best[node] <<"), ";
+   }
+   t_stream << "\n"<<std::flush;
+
+
 }
 
 } // namespace pcog

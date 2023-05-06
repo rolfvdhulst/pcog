@@ -30,16 +30,16 @@ class SolutionData {
 
    /// This data is only changed during presolve, not during branch-and-bound
    [[nodiscard]] const DenseGraph& originalGraph() const;
-   const DenseGraph& preprocessedGraph() const;
-   const PreprocessedMap& preprocessingMap() const;
-   const NodeMap& preprocessedToOriginal() const;
-   const NodeMap& originalToPreprocessed() const;
+   [[nodiscard]] const DenseGraph& preprocessedGraph() const;
+   [[nodiscard]] const PreprocessedMap& preprocessingMap() const;
+   [[nodiscard]] const NodeMap& preprocessedToOriginal() const;
+   [[nodiscard]] const NodeMap& originalToPreprocessed() const;
 
    void doPresolve();
 
    void initializeBBTree();
 
-   const std::vector<StableSetVariable>& variables() const;
+   [[nodiscard]] const std::vector<StableSetVariable>& variables() const;
    [[nodiscard]] bool isNewSet(const DenseSet& t_set) const;
    std::size_t addStableSet(DenseSet t_set);
    std::size_t findOrAddStableSet(const DenseSet& t_set);
@@ -52,6 +52,8 @@ class SolutionData {
    [[nodiscard]] std::size_t upperBound() const;
    [[nodiscard]] std::size_t lowerBound() const;
    [[nodiscard]] double fractionalLowerBound() const;
+   [[nodiscard]] SetColoring incumbentUnscaled() const;
+   [[nodiscard]] NodeColoring incumbent() const;
 
    //These functions should only be called either during (or before) processing of the root node,
    //or after a node has been solved and we evaluate the b&b tree
