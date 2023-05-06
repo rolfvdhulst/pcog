@@ -164,6 +164,61 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
        m_mapToPreprocessed.oldToNewIDs);
    std::mt19937 random_device(42); //TODO: make member
 
+   bool alwaysCheckSmallDifference = false;
+   if(alwaysCheckSmallDifference){
+      //Score them according to some function
+      scoreBranchingCandidates(
+          scoredEdges, BranchingStrategy::SMALL_DIFFERENCE, m_focusGraph,
+          m_lpSolver, m_nodeToLPRow,
+          t_solData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
+      std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
+      std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
+
+      const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
+      auto best_it = selectBestPair(scoredEdges,t_solData.settings().candidateSelectionStrategy(),
+                                    primalSol,focusToPreprocessed,t_solData.variables());
+      assert(best_it != scoredEdges.end());
+      assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
+      //TODO: how to sort/choose between node1 /node2?
+      //Do some tests on which node to eliminate when branching (e.g. simple heuristic like degree or so should do)
+
+      Node firstNode = focusToPreprocessed[best_it->node1];
+      Node secondNode = focusToPreprocessed[best_it->node2];
+
+      DenseSet differenceOne = m_focusGraph.neighbourhood(best_it->node1).difference(m_focusGraph.neighbourhood(best_it->node2));
+      DenseSet differenceTwo = m_focusGraph.neighbourhood(best_it->node2).difference(m_focusGraph.neighbourhood(best_it->node1));
+
+      std::size_t firstSize = differenceOne.size();
+      std::size_t secondSize = differenceTwo.size();
+      bool firstSmaller = firstSize <= secondSize;
+      std::size_t minSize = firstSmaller ? firstSize : secondSize;
+      assert(minSize != 0); //node should have been preprocessed in this case.
+      if(minSize == 1){
+         std::vector<std::vector<BranchData>> data{{BranchData(firstNode,secondNode,BranchType::SAME)}};
+
+         const auto& differChoice = firstSmaller ? differenceOne : differenceTwo;
+         Node fixedNode = firstSmaller ? secondNode : firstNode;
+         for(const Node neighbourOne : differChoice){
+            std::vector<BranchData> branching;
+            for(const Node diffOne : differChoice){
+               if(diffOne == neighbourOne){
+                  break;
+               }
+
+               branching.emplace_back(focusToPreprocessed[diffOne],fixedNode,BranchType::DIFFER);
+            }
+            branching.emplace_back(focusToPreprocessed[neighbourOne],fixedNode,BranchType::SAME);
+            data.emplace_back(branching);
+         }
+
+         std::cout << "Doing small-difference branching!\n";
+         node.setBranchingNodes(firstNode,secondNode);
+         node.setBranchingData(data);
+         node.setStatus(BBNodeStatus::BRANCHED);
+         return;
+      }
+   }
+
    //Score them according to some function
    scoreBranchingCandidates(
        scoredEdges, t_solData.settings().branchingStrategy(), m_focusGraph,
@@ -186,11 +241,7 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    Node secondNode = focusToPreprocessed[best_it->node2];
    node.setBranchingNodes(firstNode,secondNode);
 
-   if(!neighbourHoodDisjunction) {
-      node.setBranchingData(
-          {{BranchData(firstNode, secondNode, BranchType::SAME)},
-           {BranchData(firstNode, secondNode, BranchType::DIFFER)}});
-   }else{
+   if(neighbourHoodDisjunction) {
       DenseSet differenceOne = m_focusGraph.neighbourhood(best_it->node1).difference(m_focusGraph.neighbourhood(best_it->node2));
       DenseSet differenceTwo = m_focusGraph.neighbourhood(best_it->node2).difference(m_focusGraph.neighbourhood(best_it->node1));
 
@@ -214,6 +265,10 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
       }
 
       node.setBranchingData(data);
+   }else{
+      node.setBranchingData(
+          {{BranchData(firstNode, secondNode, BranchType::SAME)},
+           {BranchData(firstNode, secondNode, BranchType::DIFFER)}});
    }
 
    node.setStatus(BBNodeStatus::BRANCHED);
@@ -366,6 +421,10 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
          fesetround(mode);
          assert(m_lpSolver.objective() >= safeLowerBound);
          node.updateLowerBound(safeLowerBound);
+      }
+
+      if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBound()){
+         writeNodeStatistics(node,t_solData);
       }
       return PricingResult::NO_COLUMNS;
    }
@@ -709,13 +768,15 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
 }
 void ColorNodeWorker::processNextNode(SolutionData &t_solData) {
    //TODO: somehow refactor to have cleaner interface for updating the global solution data and this needing to be done less often.
-   BBNode bb_node = t_solData.popNextNode();
+   BBNode bb_node = chooseNextNode(t_solData);
 
    processNode(bb_node,t_solData);
    // TODO: check for time limit in processNode and return true/false based on hitting time limits or not
 
    if (bb_node.status() == BBNodeStatus::BRANCHED) {
-      t_solData.createChildren(bb_node,*this);
+      m_childNodes = t_solData.createChildren(bb_node,*this);
+   }else{
+      m_childNodes = {};
    }
    //Re-check the lower bounds from the trees
    t_solData.updateTreeBounds();
@@ -834,7 +895,7 @@ void ColorNodeWorker::setupNode(BBNode &node, const SolutionData &solver) {
 
       m_focusGraph = result.graph;
       m_mapToPreprocessed.extend(result.map);
-      //setupLPFromScratch(node,solver);
+//      setupLPFromScratch(node,solver);
       setupChildLP(node,solver,result.map);
    }else{
       // When not a child node, we do not bother with a scheme to attempt to 'rollback' changes;
@@ -925,6 +986,21 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
 //         }
 //      }
    }
+   if(bb_node.depth() != 0){
+      LPBasis basis = bb_node.basis();
+      NodeMap previousMapping = bb_node.previousNodeMap();
+      fixLPBasis(basis,previousMapping);
+      m_lpSolver.setBasis(basis);
+   }
+}
+BBNode&& ColorNodeWorker::chooseNextNode(SolutionData &t_solData) {
+   if(!m_childNodes.empty() && m_successiveChildNodesProcessed != 100){
+      ++m_successiveChildNodesProcessed;
+      //TODO: pick a node intelligently
+      return t_solData.popNodeWithID(m_childNodes.back());
+   }
+   m_successiveChildNodesProcessed = 0;
+   return t_solData.popNextNode();
 }
 
 } // namespace pcog

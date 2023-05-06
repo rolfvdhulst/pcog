@@ -134,6 +134,7 @@ class BBTree {
    [[nodiscard]] bool hasOpenNodes() const;
 
    BBNode &&popNextNode();
+   BBNode &&popNodeWithID(node_id id);
 
    /**
     * Remove branch-and-bound nodes whoms
@@ -141,7 +142,7 @@ class BBTree {
     * @param numColors
     */
    void pruneUpperBound(std::size_t numColors);
-   void createChildren(const BBNode &t_parentNode,
+   std::vector<node_id> createChildren(const BBNode &t_parentNode,
                        ColorNodeWorker &t_nodeWorker);
 
    [[nodiscard]] std::size_t numOpenNodes() const;
@@ -151,7 +152,7 @@ class BBTree {
    [[nodiscard]] std::size_t lowerBound() const;
 
  private:
-   void createNode(const BBNode &t_parentNode, ColorNodeWorker &worker,
+   node_id createNode(const BBNode &t_parentNode, ColorNodeWorker &worker,
                    std::vector<BranchData> t_addedBranchingDecisions);
 
    /// Newly links the adding it to the distributed ordered set structures.

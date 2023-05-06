@@ -54,10 +54,14 @@ bool BBTree::hasOpenNodes() const { return numOpenNodes() != 0; }
 
 BBNode&& BBTree::popNextNode() {
    int64_t node = lowerMin;
-
    removeFromTrees(node);
-
    return std::move(m_nodes[node]);
+}
+
+BBNode&& BBTree::popNodeWithID(node_id id){
+
+   removeFromTrees(id);
+   return std::move(m_nodes[id]);
 }
 void BBTree::pruneUpperBound(std::size_t numColors) {
    //Iterate from largest to smallest lowerBound, pruning the nodes with too high lowerBounds away
@@ -71,10 +75,13 @@ void BBTree::pruneUpperBound(std::size_t numColors) {
       node = next;
    }
 }
-void BBTree::createChildren(const BBNode& t_parentNode, ColorNodeWorker &t_nodeWorker) {
+std::vector<node_id> BBTree::createChildren(const BBNode& t_parentNode, ColorNodeWorker &t_nodeWorker) {
+   std::vector<node_id> children;
    for(const auto& data : t_parentNode.branchingData()){
-      createNode(t_parentNode,t_nodeWorker,data);
+      node_id node = createNode(t_parentNode,t_nodeWorker,data);
+      children.push_back(node);
    }
+   return children;
 }
 std::size_t BBTree::numOpenNodes() const {
    return m_nodes.size()-m_freeSlots.size();
@@ -94,7 +101,7 @@ double BBTree::fractionalLowerBound() const {
    double lb = lowerMin == RbTreeLinks<int64_t>::noLink() ? std::numeric_limits<double>::infinity() : m_nodes[lowerMin].fractionalLowerBound();
    return lb;
 }
-void BBTree::createNode(const BBNode &t_parentNode, ColorNodeWorker &t_nodeWorker,
+node_id BBTree::createNode(const BBNode &t_parentNode, ColorNodeWorker &t_nodeWorker,
                         std::vector<BranchData> t_addedBranchinDecisions) {
    node_id pos;
    std::vector<BranchData> branchingPath = t_parentNode.branchDecisions();
@@ -115,7 +122,7 @@ void BBTree::createNode(const BBNode &t_parentNode, ColorNodeWorker &t_nodeWorke
    }
    ++m_totalNodes;
    addToTrees(pos);
-
+   return pos;
 }
 void BBTree::addToTrees(node_id t_nodeId) {
    LowerRbTree rbTree(this);

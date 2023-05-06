@@ -32,6 +32,7 @@ class ColorNodeWorker {
    LPBasis basis();
    NodeMap mapToFocus() const;
  private:
+   BBNode&& chooseNextNode(SolutionData& t_soLData);
    void processNode(BBNode& node, SolutionData& t_solver);
 
    /// Performs 'node preprocessing', diminishing the size of the graphs
@@ -69,6 +70,10 @@ class ColorNodeWorker {
 
    NodeMap m_nodeToLPRow;
    NodeMap m_LPRowToNode;
+
+   std::vector<node_id> m_childNodes; //child nodes of current node
+
+   std::size_t m_successiveChildNodesProcessed = 0;
    bool solveLP();
 
    void resetNodeStatistics();

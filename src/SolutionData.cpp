@@ -263,9 +263,9 @@ const Settings &SolutionData::settings() const { return m_settings; }
 BBNode && SolutionData::popNextNode() {
    return m_tree.popNextNode();
 }
-void SolutionData::createChildren(const BBNode& t_node,
+std::vector<node_id> SolutionData::createChildren(const BBNode& t_node,
                                   ColorNodeWorker &t_nodeWorker) {
-   m_tree.createChildren(t_node,t_nodeWorker);
+   return m_tree.createChildren(t_node,t_nodeWorker);
 }
 const DenseGraph &SolutionData::preprocessedGraph() const {
    return m_preprocessedGraph;
@@ -307,5 +307,8 @@ void SolutionData::updateTreeBounds() {
       updateLowerBound(m_upperBound);
    }
 
+}
+BBNode &&SolutionData::popNodeWithID(node_id id) {
+   return m_tree.popNodeWithID(id);
 }
 }// namespace pcog

@@ -57,7 +57,9 @@ class SolutionData {
    void updateTreeBounds();
 
    BBNode&& popNextNode();
-   void createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
+   BBNode &&popNodeWithID(node_id id);
+
+   std::vector<node_id> createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
 
    [[nodiscard]] std::size_t numProcessedNodes() const;
    [[nodiscard]] std::size_t numOpenNodes() const;

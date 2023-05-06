@@ -336,7 +336,7 @@ PreprocessingResult preprocessedGraphFromChild(const DenseGraph& t_preprocessedC
          removed_nodes.emplace_back(childSecond, PreprocessedReason::DOMINATED_NODE, childFirst);
          present_nodes.remove(childSecond);
       }else if (data.type == BranchType::DIFFER){
-         updatedGraph.addEdge(data.first,data.second);
+         updatedGraph.addEdge(childFirst,childSecond);
       }
    }
    assert(present_nodes.size() == (present_nodes.capacity()-removed_nodes.size()));
