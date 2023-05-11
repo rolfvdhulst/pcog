@@ -27,7 +27,7 @@ std::optional<NodeColoring> TabuColoring::run(NodeColoring initialColoring) {
    }
    assert(objective % 2 == 0);
    objective /= 2;
-   assert(objective == numViolatedEdges(graph, coloring));
+   //assert(objective == numViolatedEdges(graph, coloring)); //TODO: commented out since it really slows down debug performance
 
    long bestObjective = objective;
    done_iterations = max_iterations;
@@ -78,7 +78,7 @@ std::optional<NodeColoring> TabuColoring::run(NodeColoring initialColoring) {
       std::size_t oldColor = coloring[bestNode];
       coloring[bestNode] = best_color;
       objective += min_value;
-      assert(objective == numViolatedEdges(graph, coloring));
+      //assert(objective == numViolatedEdges(graph, coloring));//TODO: commented out since it really slows down debug performance
       if (objective < bestObjective) {
          bestObjective = objective;
       }
@@ -123,4 +123,13 @@ long TabuColoring::numViolatedEdges(const DenseGraph &graph,
 TabuColoring::TabuColoring(const DenseGraph &graph) : graph{graph} {}
 
 std::size_t TabuColoring::numIterations() const { return done_iterations; }
+void TabuColoring::setMaxIterations(std::size_t iters) {
+   max_iterations = iters;
+}
+void TabuColoring::setTabuBase(std::size_t numBase) {
+   tabu_base = numBase;
+}
+void TabuColoring::setGamma(double gamma) {
+   tabu_gamma = gamma;
+}
 }

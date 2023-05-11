@@ -12,6 +12,9 @@ class TabuColoring {
 
  public:
    explicit TabuColoring(const DenseGraph &graph);
+   void setMaxIterations(std::size_t iters);
+   void setGamma(double gamma);
+   void setTabuBase(std::size_t numBase);
    std::optional<NodeColoring> run(NodeColoring initialColoring);
    [[nodiscard]] std::size_t numIterations() const;
    static long numViolatedEdges(const DenseGraph &graph,

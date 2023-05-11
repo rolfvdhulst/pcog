@@ -133,6 +133,7 @@ class BBTree {
 
    [[nodiscard]] bool hasOpenNodes() const;
 
+   const BBNode& peekNode(node_id) const;
    BBNode &&popNextNode();
    BBNode &&popNodeWithID(node_id id);
 

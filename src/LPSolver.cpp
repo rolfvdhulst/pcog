@@ -127,6 +127,35 @@ LPBasis LPSolver::getLPBasis() {
    basis.rowStatus.resize(m_soplex.numRows());
    basis.colStatus.resize(m_soplex.numCols());
    m_soplex.getBasis(basis.rowStatus.data(),basis.colStatus.data());
+#ifndef NDEBUG
+   for(const auto& status : basis.rowStatus){
+      assert(status == soplex::SPxSolverBase<double>::ON_LOWER ||
+             status == soplex::SPxSolverBase<double>::BASIC);
+   }
+   for(const auto& status : basis.colStatus){
+      assert(status == soplex::SPxSolverBase<double>::ON_LOWER ||
+             status == soplex::SPxSolverBase<double>::BASIC ||
+             status == soplex::SPxSolverBase<double>::FIXED);
+   }
+   std::vector<std::size_t> basicIDs;
+   for(std::size_t i = 0; i < basis.colStatus.size(); ++i){
+      if(basis.colStatus[i] == soplex::SPxSolverBase<double>::BASIC){
+         basicIDs.push_back(i);
+      }
+   }
+   std::vector<std::size_t> basicRows;
+   for(std::size_t i = 0; i < basis.rowStatus.size(); ++i){
+      if(basis.rowStatus[i] == soplex::SPxSolverBase<double>::BASIC){
+         basicRows.push_back(i);
+      }
+   }
+   auto bounds =columnUpperBounds();
+   for(std::size_t i = 0; i < bounds.size(); ++i){
+      assert((basis.colStatus[i] == soplex::SPxSolverBase<double>::FIXED) ==
+             (bounds[i].value == 0.0));
+   }
+   assert(basicIDs.size() + basicRows.size() == std::min(basis.colStatus.size(),basis.rowStatus.size()));
+#endif
 
    return basis;
 }

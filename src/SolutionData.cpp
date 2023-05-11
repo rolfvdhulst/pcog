@@ -212,7 +212,7 @@ void SolutionData::display(std::ostream& t_stream){
             << std::setw(7) << std::right<< memory <<" | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numProcessedNodes() << " | "
             << std::scientific << std::setw(8) << std::setprecision(2) << std::right << numOpenNodes() << " | "
-            << std::fixed << std::setw(6) << std::setprecision(2) << std::right << fractionalLowerBound() << " | "
+            << std::defaultfloat << std::setw(6) << std::setprecision(5) << std::right << fractionalLowerBound() << " | "
             << std::scientific << std::setw(6) << std::setprecision(2) << std::right << lowerBound() << " | ";
    if(upperBound() == std::numeric_limits<std::size_t>::max()) {
       t_stream << "    -  | ";
@@ -271,10 +271,10 @@ void SolutionData::doPresolve() {
 
    //Run tabu search to find a better initial solution.
    std::size_t numSearchColors = initialColoring.numColors()-1;
-   std::size_t lowerBound = 0;
    NodeColoring searchColoring = initialColoring;
    NodeColoring bestColoring = initialColoring;
    TabuColoring tabuAlgorithm(m_preprocessedGraph);
+   tabuAlgorithm.setMaxIterations(100'000); //TODO: make parameter
    while( lb <= numSearchColors) {
       std::size_t removeColor = numSearchColors; //We remove the 'highest' color, but different strategies are possible
       searchColoring.setNumColors(numSearchColors);
@@ -394,5 +394,8 @@ NodeColoring SolutionData::incumbent() const {
    NodeColoring preprocessedCol(m_preprocessedGraph.numNodes(),preprocessedSol);
    NodeColoring originalCol = extendColoring(preprocessedCol,m_preprocessedToOriginal,m_originalGraph);
    return originalCol;
+}
+const BBNode &SolutionData::peekNode(node_id id) const {
+   return m_tree.peekNode(id);
 }
 }// namespace pcog

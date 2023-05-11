@@ -135,6 +135,11 @@ void BBTree::removeFromTrees(node_id t_nodeId) {
    rbTree.erase(static_cast<int64_t>(t_nodeId));
    m_freeSlots.push(t_nodeId);
 }
+const BBNode &BBTree::peekNode(node_id t_nodeId) const {
+   assert(t_nodeId < m_nodes.size());
+   //TODO: assert that node is not 'freed' up
+   return m_nodes[t_nodeId];
+}
 LPBasis BBNode::basis() const { return m_initialBasis; }
 std::size_t BBNode::getNumAddedBranchingDecisions() const { return m_numAddedBranchingDecisions; }
 void BBNode::setBasis(LPBasis basis) {

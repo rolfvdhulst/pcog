@@ -6,8 +6,9 @@
 #include "pcog/Branching.hpp"
 #include "pcog/BranchingSelection.hpp"
 #include "pcog/ColorSolver.hpp"
-#include "pcog/mwss/CombinatorialStableSet.hpp"
+#include "pcog/TabuColoring.hpp"
 #include "pcog/mwss/AugmentingSearch.hpp"
+#include "pcog/mwss/CombinatorialStableSet.hpp"
 
 // TODO: add error handling, particularly LP-related.
 namespace pcog {
@@ -151,6 +152,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
 }
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
                                                const SolutionData &t_solData) {
+   //TODO: divide function into smaller functions
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    if(node.lowerBound() >= t_solData.upperBoundUnscaled()){
       node.setStatus(BBNodeStatus::CUT_OFF);
@@ -531,7 +533,9 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
          projectedVar.projectedSet.inplaceDifference(removeSet);
       }
    }
-   if(uncoloredNodes.empty() && color_indices.size() < t_solData.upperBoundUnscaled()){
+   bool addSuboptimalSolutions = false;
+   if(uncoloredNodes.empty() &&
+       (color_indices.size() < t_solData.upperBoundUnscaled() || addSuboptimalSolutions)){
       //project solution back to original graph; although the sets form a coloring for this graph after branching, we also want to solution
       //to be valid in the root node.
       DenseSet originalUncolored(m_completeFocusGraph.numNodes(),true);
@@ -545,8 +549,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
             indices.emplace_back(elem->index);
          }
          //we synchronize data so it looks nice when we display
-         writeNodeStatistics(node,t_solData);
-         t_solData.addSolution(indices);
+         addSolution(indices,node,t_solData,true);
       }else{
          // Need to repair the solution.
          // In this case we need to add columns which are also valid in the current node
@@ -571,8 +574,8 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
          writeNodeStatistics(node,t_solData);
          t_solData.addSolution(indices);
          std::size_t after = t_solData.variables().size();
-
          std::cout<<fixedColoring.numColors()<<"-coloring repaired, " <<after -before <<" new stable sets\n";
+         //improvementHeuristic(indices,node,t_solData);//TODO: fix LP problems coming from bad columns entering LP?
          //how to do this; repair one at a time?
       };
    }
@@ -630,7 +633,7 @@ ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring,
       }
    }
    addColumnsToLP(toAddSets,t_solData);
-   solveLP();
+   solveLP(); //TODO: why are we resolving LP here?
    return colorIndices;
 }
 void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
@@ -749,8 +752,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       }
       if(originalUncolored.empty()) {
          // no need to repair
-         writeNodeStatistics(t_node,t_solData);
-         t_solData.addSolution(indices);
+         addSolution(indices,t_node,t_solData,true);
       }else{
          std::cout<<"Could not repair diving solution : "<<m_lpSolver.objective()<<"\n";
       }
@@ -765,6 +767,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       m_lpSolver.setObjectiveUpperLimit(soplex::infinity);
    }
 //   m_lpSolver.setIntegralityPolishing(false);
+
 }
 void ColorNodeWorker::processNextNode(SolutionData &t_solData) {
    //TODO: somehow refactor to have cleaner interface for updating the global solution data and this needing to be done less often.
@@ -964,7 +967,7 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
 
    auto bounds = m_lpSolver.columnUpperBounds();
    const auto& variables = t_solData.variables();
-   assert(bounds.size() == variables.size());
+   assert(bounds.size() == variables.size()); //TODO: can fail sometimes (fails on brock200_4.clq; somehow more variables in the LP)
    //Fix variables to zero for columns which do not fit the current subproblem
    for(std::size_t j = 0; j < bounds.size(); ++j){
       if(bounds[j].value == 0.0) continue;
@@ -972,19 +975,6 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
       if(!m_completeFocusGraph.setIsStable(set)){
          m_lpSolver.changeBounds(j,0.0,0.0);
       }
-      //TODO: below misses some columns, probably has to do with SAME
-//      for(std::size_t i = numDecisions-numAdded; i < numDecisions; ++i){
-//         const auto& decision = decisions[i];
-//         if ((decision.type == BranchType::DIFFER &&
-//              set.contains(decision.first) && set.contains(decision.second)) ||
-//             (decision.type == BranchType::SAME &&
-//              (set.contains(decision.first) !=
-//               set.contains(decision.second)))) {
-//            //set upper bound to zero. We do this one at a time (and not all at once), so that SoPlex might be better able to preserve basis information
-//            m_lpSolver.changeBounds(j,0.0,0.0);
-//            break;
-//         }
-//      }
    }
    if(bb_node.depth() != 0){
       LPBasis basis = bb_node.basis();
@@ -993,14 +983,123 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
       m_lpSolver.setBasis(basis);
    }
 }
-BBNode&& ColorNodeWorker::chooseNextNode(SolutionData &t_solData) {
-   if(!m_childNodes.empty() && m_successiveChildNodesProcessed != 5){
-      ++m_successiveChildNodesProcessed;
-      //TODO: pick a node intelligently
-      return t_solData.popNodeWithID(m_childNodes.back());
-   }
+BBNode && ColorNodeWorker::chooseChildNode(SolutionData& t_solData, std::size_t t_nodePos){
+   ++m_successiveChildNodesProcessed;
+   return t_solData.popNodeWithID(t_nodePos);
+}
+BBNode && ColorNodeWorker::chooseBestNode(SolutionData& t_solData){
    m_successiveChildNodesProcessed = 0;
    return t_solData.popNextNode();
+}
+
+BBNode&& ColorNodeWorker::chooseNextNode(SolutionData &t_solData) {
+   switch (t_solData.settings().nodeSelectionStrategy()) {
+   case ::NodeSelectionStrategy::BOUND:{
+      return chooseBestNode(t_solData);
+   }
+   case ::NodeSelectionStrategy::DFS_BOUND:{
+      if(!m_childNodes.empty()){
+         std::size_t nodePos = pickChildNode(t_solData.settings().nodeChildSelectionStrategy(),m_childNodes);
+         std::size_t nodeLowerBound = t_solData.peekNode(nodePos).lowerBound();
+         if(t_solData.lowerBound() == nodeLowerBound){
+            return chooseChildNode(t_solData,nodePos);
+         }
+      }
+      return chooseBestNode(t_solData);
+   }
+   case ::NodeSelectionStrategy::DFS_RESTART:
+   {
+      if(!m_childNodes.empty() && m_successiveChildNodesProcessed != t_solData.settings().dfsRestartFrequency()){
+         std::size_t nodePos = pickChildNode(t_solData.settings().nodeChildSelectionStrategy(),m_childNodes);
+         return chooseChildNode(t_solData,nodePos);
+      }
+      m_successiveChildNodesProcessed = 0;
+      return t_solData.popNextNode();
+   }
+   }
+
+}
+void ColorNodeWorker::improvementHeuristic(const std::vector<std::size_t>& solVarIndices,
+                                           BBNode &t_node,
+                                           SolutionData &t_solData) {
+
+   const auto& preprocessedGraph = t_solData.preprocessedGraph();
+   const auto& variables = t_solData.variables();
+   SetColoring initialColoring;
+   for(const auto& index : solVarIndices){
+      initialColoring.addColor(variables[index].set());
+   }
+
+   std::size_t numSearchColors = initialColoring.numColors()-1;
+   std::size_t lowerBound = 0;
+   NodeColoring searchColoring(preprocessedGraph.numNodes(),initialColoring);
+   NodeColoring bestColoring = searchColoring;
+
+   std::size_t lb = t_solData.lowerBound();
+   std::size_t ub = t_solData.upperBound();
+   TabuColoring tabuAlgorithm(preprocessedGraph);
+   while( lb <= numSearchColors) {
+      if(bestColoring.numColors() <= ub){
+         tabuAlgorithm.setMaxIterations(20'000);
+      }else{
+         tabuAlgorithm.setMaxIterations(5'000);
+      }
+      std::size_t removeColor = numSearchColors; //We remove the 'highest' color, but different strategies are possible
+      searchColoring.setNumColors(numSearchColors);
+      for(std::size_t i = 0; i < preprocessedGraph.numNodes(); ++i) {
+         if(searchColoring[i] == removeColor) {
+            searchColoring[i]--; // We set it to be the next color; again different strategies are possible.
+         }
+      }
+      auto foundColoring = tabuAlgorithm.run(searchColoring);
+      if(foundColoring.has_value()) {
+         searchColoring = foundColoring.value();
+         bestColoring = foundColoring.value();
+
+      }else {
+         break;
+      }
+      --numSearchColors;
+   }
+   //Add best coloring if it was improved
+   if(bestColoring.numColors() < initialColoring.numColors()){
+      std::cout<<"Improved "<<initialColoring.numColors()<<"-coloring into a "<< bestColoring.numColors()<<"-coloring\n";
+
+      SetColoring bestSetColoring(bestColoring);
+      for(auto& color : bestSetColoring.colors()) {
+         maximizeStableSet(color,preprocessedGraph);
+      }
+
+      std::vector<std::size_t> indices = repairColoring(bestSetColoring.colors(),t_solData);
+      addSolution(indices,t_node,t_solData,false);
+   }
+
+}
+void ColorNodeWorker::addSolution(const std::vector<std::size_t>& indices,
+                                  BBNode& t_node,
+                                  SolutionData& t_solData,
+                                  bool doImprovements) {
+   writeNodeStatistics(t_node,t_solData);
+   t_solData.addSolution(indices);
+
+   if(doImprovements){
+      //improvementHeuristic(indices,t_node,t_solData);
+   }
+}
+std::size_t
+ColorNodeWorker::pickChildNode(NodeChildSelectionStrategy strategy,
+                               const std::vector<std::size_t> &children) {
+   assert(!children.empty());
+   switch (strategy) {
+   case NodeChildSelectionStrategy::PREFER_SAME:
+      return children.front(); //TODO: A bit ugly; it assumes that the worker also puts the SAME and DIFFER branches in this order. Probably should check here
+   case NodeChildSelectionStrategy::PREFER_DIFFER:
+      return children.back();
+   case NodeChildSelectionStrategy::RANDOMLY:{
+      std::uniform_int_distribution<std::size_t> dist(0,children.size()-1);
+      return children[dist(m_random_engine)];
+   }
+   }
 }
 
 } // namespace pcog

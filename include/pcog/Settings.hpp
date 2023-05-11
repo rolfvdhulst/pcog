@@ -36,6 +36,23 @@ enum class CandidateSelectionStrategy {
    FIRST = 4
 };
 
+enum class NodeSelectionStrategy {
+   BOUND,     /// Choose the b&b node with smallest lower bound.
+   DFS_BOUND, /// Pick child nodes of the current node until a child node has a
+              /// lower bound greater than the current global lower bound.
+              /// In this case, it backtracks to the node with smallest lower bound.
+              /// This method is useful for hard instances to quickly improve the lower bound
+   DFS_RESTART /// Pick a child node of the current node if possible.
+               /// Restart every x nodes where x is equal to restartDFSFrequency,
+               /// choosing the node with smallest bound.
+};
+
+///When picking a child node
+enum class NodeChildSelectionStrategy{
+   PREFER_SAME,
+   PREFER_DIFFER,
+   RANDOMLY
+};
 class Settings {
  public:
    Settings();
@@ -87,6 +104,21 @@ class Settings {
       m_diving_pricing_frequency = t_frequency;
    }
    [[nodiscard]] int divingPricingFrequency() const { return m_diving_pricing_frequency; }
+
+   void setNodeSelectionStrategy(NodeSelectionStrategy t_strategy){
+      m_nodeSelectionStrategy = t_strategy;
+   }
+   [[nodiscard]] NodeSelectionStrategy nodeSelectionStrategy() const {return m_nodeSelectionStrategy;}
+
+   void setDfsRestartFrequency(std::size_t t_frequency){
+      m_dfsRestartFrequency = t_frequency;
+   }
+   [[nodiscard]] std::size_t dfsRestartFrequency() const {return m_dfsRestartFrequency;}
+
+   void setNodeChildSelectionStrategy(NodeChildSelectionStrategy t_strategy){
+      m_nodeChildSelectionStrategy = t_strategy;
+   }
+   [[nodiscard]] NodeChildSelectionStrategy nodeChildSelectionStrategy() const {return m_nodeChildSelectionStrategy;}
  private:
    std::size_t m_node_limit; /// maximal number of nodes to process
    double m_time_limit; /// maximal time in seconds to run
@@ -95,6 +127,11 @@ class Settings {
 
    BranchingStrategy m_branchingStrategy;
    CandidateSelectionStrategy m_branchCandidateSelectionStrategy;
+
+
+   NodeSelectionStrategy m_nodeSelectionStrategy;
+   NodeChildSelectionStrategy m_nodeChildSelectionStrategy;
+   std::size_t m_dfsRestartFrequency;
 
    double m_rounding_tolerance; /// The rounding tolerance is used in various places to decide if a double value is integral or not
    /// Changing this value does not affect correctness of our algorithms since we use methods which protect against numerical errors

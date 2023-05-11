@@ -61,6 +61,7 @@ class SolutionData {
    void updateFractionalLowerBound(double t_fractional_lb);
    void updateTreeBounds();
 
+   [[nodiscard]] const BBNode& peekNode(node_id id) const; //peek at the given node
    BBNode&& popNextNode();
    BBNode &&popNodeWithID(node_id id);
 
