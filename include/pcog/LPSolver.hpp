@@ -33,10 +33,27 @@ enum class ObjectiveSense { MINIMIZE, MAXIMIZE };
 
 enum class LPSolverStatus {INFEASIBLE, OPTIMAL, ERROR};
 struct LPBasis{
+   LPBasis(std::size_t numRows, std::size_t numCols) : rowStatus(numRows,soplex::SPxSolver::VarStatus::ON_LOWER),
+                                                       colStatus(numCols,soplex::SPxSolver::VarStatus::ON_LOWER){};
+   LPBasis() = default;
    std::vector<soplex::SPxSolver::VarStatus> rowStatus;
    std::vector<soplex::SPxSolver::VarStatus> colStatus;
    friend class LPSolver;
 };
+// The 'normal' LP basis as computed by SoPlex can become very large if the LP becomes large.
+// By storing only the basic rows/columns and inferring the others
+// we can save a lot of space in the Branch and Bound node storage
+struct SmallBasis{
+   //Rows are assumed to be at their lower bound (and otherwise, here stored as basic)
+   std::vector<std::size_t> basicRows;
+
+   //In principle, we assume that columns for which LB=UB are FIXED by default and
+   //other columns are at their lower bound by default. It can happen that fixed columns
+   //become basic (do not ask me why)
+   std::vector<std::size_t> basicCols;
+};
+
+SmallBasis toSmallBasis(const LPBasis& basis);
 /// \brief class which holds the LP solver
 class LPSolver {
  public:

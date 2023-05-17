@@ -66,15 +66,36 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
       }
       return;
    case BranchingStrategy::INTERSECTION_UNION_SIZE:
+   {
+      std::vector<std::size_t> degrees(graph.numNodes());
+      auto dual = t_lpSolver.getDualSolution();
+
+      for(std::size_t i = 0; i < degrees.size(); ++i){
+         degrees[i] = graph.neighbourhood(i).size();
+      }
+      for(std::size_t i = 0; i < degrees.size(); ++i){
+         if(fabs(dual[i].value) < 1e-8){
+            for(const auto& node : graph.neighbourhood(i)){
+               if(degrees[node] > 0){
+                  degrees[node] -= 1;
+               }
+            }
+            degrees[i] = 0;
+         }
+      }
+
+
       for (auto &candidate : candidates) {
-         std::size_t size_1 = graph.neighbourhood(candidate.node1).size();
-         std::size_t size_2 = graph.neighbourhood(candidate.node2).size();
+
+         std::size_t size_1 =  degrees[candidate.node1];
+         std::size_t size_2 =  degrees[candidate.node2];
          candidate.score = static_cast<double>(size_1 + size_2);
          // IS + union size is the same as just counting
          // every element once for both individually
          // elements in the intersection
       }
       return;
+   }
    case BranchingStrategy::SYMMETRIC_DIFFERENCE_SIZE:
       for (auto &candidate : candidates) {
          candidate.score = static_cast<double>(

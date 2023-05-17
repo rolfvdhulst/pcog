@@ -27,7 +27,7 @@ class ColorNodeWorker {
 
    void processNextNode(SolutionData &t_solData);
    LPBasis basis();
-   NodeMap mapToFocus() const;
+   NodeMap focusToPreprocessed() const;
 
  private:
    std::size_t pickChildNode(NodeChildSelectionStrategy strategy, const std::vector<std::size_t>& children);
@@ -61,7 +61,7 @@ class ColorNodeWorker {
    /// vertices u and v
    void computeBranchingVertices(BBNode &node, const SolutionData &t_solver);
 
-   void fixLPBasis(LPBasis &basis, const NodeMap &previous_nodemap);
+   LPBasis fixLPBasis(const SmallBasis &basis, const NodeMap &previous_nodemap);
 
    void maximizeStableSet(DenseSet &set, const DenseGraph &graph);
    void addColumns(const std::vector<DenseSet> &sets, SolutionData &t_solver);

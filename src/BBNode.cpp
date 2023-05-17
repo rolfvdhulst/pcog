@@ -46,7 +46,7 @@ void BBTree::createRootNode(std::size_t numRootGraphNodes) {
    m_nodes.emplace_back(0, INVALID_BB_NODE, 0, 0.0, 0,
                             std::vector<BranchData>{BranchData(
                                 INVALID_NODE, INVALID_NODE, BranchType::ROOT)},1
-                        ,LPBasis(),NodeMap::identity(numRootGraphNodes));
+                        ,SmallBasis{},NodeMap::identity(numRootGraphNodes));
    m_totalNodes = 1;
    addToTrees(0);
 }
@@ -113,14 +113,14 @@ node_id BBTree::createNode(const BBNode &t_parentNode, ColorNodeWorker &t_nodeWo
       m_nodes.emplace_back(m_totalNodes, t_parentNode.id(), t_parentNode.depth()+1,
                            t_parentNode.fractionalLowerBound(),
                            t_parentNode.lowerBound(), branchingPath, t_addedBranchinDecisions.size(),
-                           t_parentNode.basis(),t_nodeWorker.mapToFocus());
+                           t_parentNode.basis(),t_nodeWorker.focusToPreprocessed());
    }else{
       pos = m_freeSlots.top();
       m_freeSlots.pop();
       m_nodes[pos] = BBNode(m_totalNodes, t_parentNode.id(), t_parentNode.depth()+1,
                             t_parentNode.fractionalLowerBound(),
                             t_parentNode.lowerBound(), branchingPath,t_addedBranchinDecisions.size(),
-                            t_parentNode.basis(),t_nodeWorker.mapToFocus());
+                            t_parentNode.basis(),t_nodeWorker.focusToPreprocessed());
    }
    ++m_totalNodes;
    addToTrees(pos);
@@ -140,9 +140,9 @@ const BBNode &BBTree::peekNode(node_id t_nodeId) const {
    //TODO: assert that node is not 'freed' up
    return m_nodes[t_nodeId];
 }
-LPBasis BBNode::basis() const { return m_initialBasis; }
+SmallBasis BBNode::basis() const { return m_initialBasis; }
 std::size_t BBNode::getNumAddedBranchingDecisions() const { return m_numAddedBranchingDecisions; }
-void BBNode::setBasis(LPBasis basis) {
+void BBNode::setBasis(SmallBasis basis) {
    m_initialBasis = std::move(basis);
 }
 } // namespace pcog

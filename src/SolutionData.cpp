@@ -189,6 +189,24 @@ void SolutionData::reset(DenseGraph t_graph) {
 const DenseGraph &SolutionData::originalGraph() const {
    return m_originalGraph;
 }
+
+//Estimates the difficulty of solving the pricing problem exactly by roughly
+//estimating the b&b tree size of a simple heuristic (using quite a few assumptions)
+double difficultyEstimation(const DenseGraph& graph){
+   double invDensity = 1.0- graph.density();
+   double N = graph.numNodes();
+   double avDepth = - std::log(N) / std::log(invDensity);
+   double sum = avDepth < 1.0 ? 1.0 : 0.0;
+   for(std::size_t i = 0; i < (avDepth); ++i){
+      sum += std::pow(invDensity, static_cast<double>(i * (i + 1)) /2.0);
+   }
+   sum *= N;
+
+   //the function tends to slightly overestimate the difficulty of dense graphs; hence we 'correct' it
+   sum = sum*(1+invDensity);
+   return sum;
+}
+
 void SolutionData::displayHeader(std::ostream& t_stream) const{
    if(m_printheader_counter == 0){
       t_stream << "      System      |        Nodes        |          Bounds          |            Work              \n";
@@ -241,7 +259,7 @@ void SolutionData::startSolveTime() {
 }
 void SolutionData::doPresolve() {
    // TODO: find an initial coloring using a simple greedy method.
-   GreedyColoring greedy(m_originalGraph);
+   GreedyColoring greedy(m_originalGraph); //TODO: extract clique from saturation degree
    auto coloring = greedy.run_saturation_degree();
    std::cout<<"DSATUR found " << coloring.numColors()<<"-coloring\n";
 

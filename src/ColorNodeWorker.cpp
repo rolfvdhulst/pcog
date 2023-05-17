@@ -129,7 +129,9 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node, SolutionData &t_solData) {
 }
 void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool duringDiving) {
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
-   while (true) {
+   std::size_t numPricingRoundsLimit = std::numeric_limits<std::size_t>::max(); //TODO: limit pricing during diving? Or not, maybe?
+   std::size_t numRounds = 0;
+   while (numRounds < numPricingRoundsLimit) {
       // Run rounding heuristics / integrality check on the current LP solution
       roundingHeuristic(node,t_solData);
       // Solve pricing problem. If new columns can be found, add them and
@@ -147,8 +149,11 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
          // TODO: error handling
          break;
       }
+      ++numRounds;
    }
-   node.setBasis(m_lpSolver.getLPBasis()); //TODO: only save here when diving, maybe?
+   if(!duringDiving){
+      node.setBasis(toSmallBasis(m_lpSolver.getLPBasis())); //TODO: which basis do we actually want to use?
+   }
 }
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
                                                const SolutionData &t_solData) {
@@ -584,37 +589,38 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
 LPBasis ColorNodeWorker::basis() {
    return m_lpSolver.getLPBasis();
 }
-NodeMap ColorNodeWorker::mapToFocus() const {
-   return m_mapToPreprocessed.oldToNewIDs;
+NodeMap ColorNodeWorker::focusToPreprocessed() const {
+   return m_mapToPreprocessed.newToOldIDs;
 }
-void ColorNodeWorker::fixLPBasis(LPBasis &basis,
+LPBasis ColorNodeWorker::fixLPBasis(const SmallBasis &basis,
                                  const NodeMap &previous_nodemap) {
+   LPBasis largeBasis(m_lpSolver.numRows(),m_lpSolver.numCols()); //Fills status with ON_LOWER initially
    //fix rows of the basis
-   //Rows which were not in previous rowmaps are also not in this one
-   std::vector<soplex::SPxSolverBase<double>::VarStatus> originalNodeStatus(previous_nodemap.size(),soplex::SPxSolverBase<double>::ON_LOWER);
-   for(std::size_t i = 0; i < previous_nodemap.size();++i){
-      if(previous_nodemap[i] != INVALID_NODE){
-         originalNodeStatus[i] = basis.rowStatus[previous_nodemap[i]];
-      }
-   }
    assert(m_lpSolver.numRows() == m_mapToPreprocessed.newToOldIDs.size());
-   basis.rowStatus.resize(m_lpSolver.numRows());
-   for(std::size_t i = 0; i < m_mapToPreprocessed.newToOldIDs.size(); ++i){
-      basis.rowStatus[i] = originalNodeStatus[m_mapToPreprocessed.newToOldIDs[i]];
-   }
 
-   //fix (extra) columns to zero initially
-   std::size_t previousSize = basis.colStatus.size();
-   std::size_t nextSize = m_lpSolver.numCols();
-   if(previousSize < nextSize){
-      basis.colStatus.resize(nextSize);
-      for(std::size_t i = previousSize; i < nextSize; ++i){
-         basis.colStatus[i] = soplex::SPxSolverBase<double>::ON_LOWER;
+   for(const auto& index : basis.basicRows){
+      std::size_t preprocessedIndex = previous_nodemap[index];
+      std::size_t newIndex = m_mapToPreprocessed.oldToNewIDs[preprocessedIndex];
+      if(newIndex != INVALID_NODE){
+         largeBasis.rowStatus[newIndex] = soplex::SPxSolverBase<double>::BASIC;
       }
    }
 
-   assert(basis.rowStatus.size() == m_lpSolver.numRows() && basis.colStatus.size() == m_lpSolver.numCols());
+   // Set all fixed columns; This does not seem to actually change the # of iterations,
+   // but it stays closer to soplex' basis output so the chance we are doing
+   // something wrong is smaller
+   auto upperBounds = m_lpSolver.columnUpperBounds();
+   for (std::size_t i = 0; i < upperBounds.size(); ++i) {
+      if (upperBounds[i].value == 0.0) {
+         largeBasis.colStatus[i] = soplex::SPxSolverBase<double>::FIXED;
+      }
+   }
+   for(const auto& index : basis.basicCols){
+      largeBasis.colStatus[index] = soplex::SPxSolverBase<double>::BASIC; //TODO: experiment with fixing columns which were zero'd out?
+   }
 
+   assert(largeBasis.rowStatus.size() == m_lpSolver.numRows() && largeBasis.colStatus.size() == m_lpSolver.numCols());
+   return largeBasis;
 }
 std::vector<std::size_t>
 ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring,
@@ -688,7 +694,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
 
    bool solution_found = false;
    while(true){
-      //std::cout<<"Diving objective: "<<m_lpSolver.objective()<<"\n";
+      std::cout<<"Diving objective: "<<m_lpSolver.objective()<<"\n";
       auto sol = m_lpSolver.getPrimalSolution();
       auto best_it = sol.end();
       double best_score = - std::numeric_limits<double>::infinity();
@@ -865,9 +871,7 @@ void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node,
 
    //set up LP Basis:
    if(bb_node.depth() != 0){
-      LPBasis basis = bb_node.basis();
-      NodeMap previousMapping = bb_node.previousNodeMap();
-      fixLPBasis(basis,previousMapping);
+      LPBasis basis = fixLPBasis(bb_node.basis(),bb_node.previousNodeMap());
       m_lpSolver.setBasis(basis);
    }
 }
@@ -944,7 +948,6 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
       for(const auto& node : t_childMap.removed_nodes){
          permutation[m_nodeToLPRow[node.removedNode()]] = -1;
       }
-      auto previousMap = bb_node.previousNodeMap();
       m_lpSolver.removeRows(permutation);
       // permutation vector now gives old LP row to new LP row mapping e.g.
       // perm[old_row ] returns the new row (note; terms of the OLD node indices)
@@ -977,9 +980,7 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
       }
    }
    if(bb_node.depth() != 0){
-      LPBasis basis = bb_node.basis();
-      NodeMap previousMapping = bb_node.previousNodeMap();
-      fixLPBasis(basis,previousMapping);
+      LPBasis basis = fixLPBasis(bb_node.basis(),bb_node.previousNodeMap());
       m_lpSolver.setBasis(basis);
    }
 }

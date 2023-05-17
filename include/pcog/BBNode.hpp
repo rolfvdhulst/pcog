@@ -29,7 +29,7 @@ class BBNode {
    BBNode(node_id id, node_id parent_id, node_id depth,
           double fractionalLowerBound, std::size_t lowerBound,
           std::vector<BranchData> branchInfo, std::size_t numAddedBranches,
-          LPBasis t_basis, NodeMap t_map)
+          SmallBasis t_basis, NodeMap t_map)
        : m_id{id}, m_parent_id{parent_id}, m_depth{depth},
          m_branchingDecisions{std::move(branchInfo)},
          m_numAddedBranchingDecisions{numAddedBranches},
@@ -81,9 +81,9 @@ class BBNode {
       }
       return true;
    }
-   [[nodiscard]] LPBasis basis() const;
+   [[nodiscard]] SmallBasis basis() const;
 
-   void setBasis(LPBasis basis);
+   void setBasis(SmallBasis basis);
    [[nodiscard]] NodeMap previousNodeMap() const {return m_previousNodeMap;}
 
 
@@ -118,7 +118,7 @@ class BBNode {
    std::vector<std::vector<BranchData>> m_branchingData;
 
    NodeMap m_previousNodeMap; // needed to interpret previous basis
-   LPBasis m_initialBasis;
+   SmallBasis m_initialBasis;
 
    RbTreeLinks<int64_t> m_lowerLinks;
 };
