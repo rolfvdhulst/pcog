@@ -32,11 +32,8 @@ class BBTree::LowerRbTree : public RbTree<LowerRbTree> {
 };
 
 void BBTree::clear() {
-   while(!m_freeSlots.empty()){ //TODO: can clear more efficiently
-      m_freeSlots.pop();
-   }
+   m_freeSlots = {};
    m_nodes.clear();
-   m_selection_strategy = NodeSelectionStrategy::DFS; // TODO: reset selection strategy?
 }
 void BBTree::createRootNode(std::size_t numRootGraphNodes) {
    assert(m_nodes.empty());
