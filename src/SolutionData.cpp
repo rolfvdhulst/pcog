@@ -29,6 +29,8 @@
 #endif
 
 
+#include <thread>
+
 namespace pcog {
 // Stackoverflow solution to get memory used by the process. Not perfect.
 /// The amount of memory currently being used by this process, in bytes.
@@ -128,14 +130,23 @@ void SolutionData::addSolution(std::vector<std::size_t> t_stable_set_indices) {
    }
    m_colorings.emplace_back(std::move(t_stable_set_indices));
 }
-std::size_t SolutionData::lowerBoundUnscaled() const {return m_lowerBound;}
-std::size_t SolutionData::upperBoundUnscaled() const {return m_upperBound;}
+std::size_t SolutionData::lowerBoundUnscaled() {
+   std::scoped_lock guard(m_lowerBound_mutex);
+   return m_lowerBound;}
+std::size_t SolutionData::upperBoundUnscaled() {
+   std::scoped_lock guard(m_upperBound_mutex);
+   return m_upperBound;
+}
 
-std::size_t SolutionData::upperBound() const { return m_upperBound + m_preprocessedToOriginal.fixed_sets.size(); }
-std::size_t SolutionData::lowerBound() const { return m_lowerBound + m_preprocessedToOriginal.fixed_sets.size(); }
-double SolutionData::fractionalLowerBound() const {
-   return m_fractionalLowerBound +
-          static_cast<double>(m_preprocessedToOriginal.fixed_sets.size());
+std::size_t SolutionData::upperBound() {
+   return upperBoundUnscaled() + m_preprocessedToOriginal.fixed_sets.size();
+}
+std::size_t SolutionData::lowerBound() {
+   return lowerBoundUnscaled() + m_preprocessedToOriginal.fixed_sets.size();
+}
+double SolutionData::fractionalLowerBound()  {
+   std::scoped_lock guard(m_lowerBound_mutex);
+   return m_fractionalLowerBound + static_cast<double>(m_preprocessedToOriginal.fixed_sets.size());
 }
 bool SolutionData::isNewSet(const DenseSet &t_set) const {
    return std::all_of(m_variables.begin(), m_variables.end(),
@@ -150,14 +161,6 @@ std::size_t SolutionData::addStableSet(pcog::DenseSet t_set) {
    std::size_t index = m_variables.size();
    m_variables.emplace_back(std::move(t_set));
    return index;
-}
-std::size_t SolutionData::findOrAddStableSet(const DenseSet &t_set) {
-   for (std::size_t i = 0; i < m_variables.size(); ++i) {
-      if (m_variables[i].set() == t_set) {
-         return i;
-      }
-   }
-   return addStableSet(t_set);
 }
 SolutionData::SolutionData( Settings& t_settings)
     :m_incumbent_index{std::numeric_limits<std::size_t>::max()},
@@ -214,6 +217,7 @@ void SolutionData::displayHeader(std::ostream& t_stream) const{
    t_stream << "   time |  memory | explored |     open |   frac |  lower |  upper |  vars |   LP it | Pric it | \n";
 }
 void SolutionData::display(std::ostream& t_stream){
+   std::scoped_lock guard(m_printing_mutex);
    if(m_printheader_counter % 20 == 0){
       displayHeader(t_stream);
    }
@@ -324,8 +328,10 @@ void SolutionData::doPresolve() {
    }
 
    if(lb > 0) {
-      updateFractionalLowerBound(static_cast<double>(lb));
-      updateLowerBound(lb);
+      auto f_lb =  static_cast<double>(lb) ; //TODO: rounding mode / safe rounding
+
+      std::scoped_lock guard(m_lowerBound_mutex);
+      assignLB(f_lb,lb);
    }
    addSolution(indices);
 
@@ -349,9 +355,6 @@ const std::vector<StableSetVariable> &SolutionData::variables() const {
    return m_variables;
 }
 const Settings &SolutionData::settings() const { return m_settings; }
-BBNode && SolutionData::popNextNode() {
-   return m_tree.popNextNode();
-}
 std::vector<node_id> SolutionData::createChildren(const BBNode& t_node,
                                   ColorNodeWorker &t_nodeWorker) {
    return m_tree.createChildren(t_node,t_nodeWorker);
@@ -368,38 +371,8 @@ const NodeMap &SolutionData::preprocessedToOriginal() const {
 const NodeMap &SolutionData::originalToPreprocessed() const {
    return m_preprocessedToOriginal.oldToNewIDs;
 }
-void SolutionData::addPricingIterations(std::size_t count) {
-   m_pricingIterations += count;
-}
-void SolutionData::addLPIterations(std::size_t count) {
-   m_lpIterations += count;
-}
-void SolutionData::updateLowerBound(std::size_t t_lb) {
-   if(t_lb > m_lowerBound){
-      m_lowerBound = t_lb;
-      //TODO: are there any lb changes we need to trigger here?
-      display(std::cout);
-   }
-}
-void SolutionData::updateFractionalLowerBound(double t_fractional_lb) {
-   if(t_fractional_lb > m_fractionalLowerBound){
-      m_fractionalLowerBound = t_fractional_lb;
-   }
-}
-void SolutionData::updateTreeBounds() {
-   if(m_tree.hasOpenNodes()) {
-      updateFractionalLowerBound(m_tree.fractionalLowerBound());
-      updateLowerBound(m_tree.lowerBound());
-   }else {
-      //In case the node-queue is empty, we have proven that the lower and upper bounds are equal :)
-      updateFractionalLowerBound(static_cast<double>(upperBoundUnscaled()));
-      updateLowerBound(upperBoundUnscaled());
-   }
 
-}
-BBNode &&SolutionData::popNodeWithID(node_id id) {
-   return m_tree.popNodeWithID(id);
-}
+
 SetColoring SolutionData::incumbentUnscaled() const {
    SetColoring coloring;
    for(const auto& index : m_colorings[m_incumbent_index]) {
@@ -413,7 +386,257 @@ NodeColoring SolutionData::incumbent() const {
    NodeColoring originalCol = extendColoring(preprocessedCol,m_preprocessedToOriginal,m_originalGraph);
    return originalCol;
 }
-const BBNode &SolutionData::peekNode(node_id id) const {
-   return m_tree.peekNode(id);
+
+void SolutionData::synchronizeLocalDataStatistics(LocalSolutionData &t_localData) {
+   m_lpIterations += t_localData.m_lpIterations;
+   t_localData.m_lpIterations = 0;
+
+   m_pricingIterations += t_localData.m_pricingIterations;
+   t_localData.m_pricingIterations = 0;
+}
+
+void SolutionData::writeLocalVariablesToGlobal(
+    LocalSolutionData &t_localSolutionData) {
+   //This function assumes that the user has locked the mutex; it is just there to avoid repetition
+   assert(t_localSolutionData.m_lastGlobalAddedIndex >= t_localSolutionData.m_numStartGlobalVariables);
+   assert(t_localSolutionData.m_lastGlobalAddedIndex - t_localSolutionData.m_numStartGlobalVariables ==
+          t_localSolutionData.m_variable_mapping.size());
+
+   if(t_localSolutionData.m_variables.size() == t_localSolutionData.m_numStartGlobalVariables){
+      return;
+   }
+   assert(t_localSolutionData.m_variables.size() > t_localSolutionData.m_numStartGlobalVariables);
+   t_localSolutionData.m_variable_mapping.resize(t_localSolutionData.m_variables.size() - t_localSolutionData.m_numStartGlobalVariables);
+   for(std::size_t i = t_localSolutionData.m_lastGlobalAddedIndex; i < t_localSolutionData.m_variables.size(); ++i) {
+      std::size_t index = findOrAddStableSet(t_localSolutionData.m_variables[i].set(),t_localSolutionData.m_numStartGlobalVariables);
+      t_localSolutionData.m_variable_mapping[i- t_localSolutionData.m_numStartGlobalVariables] = index;
+   }
+   t_localSolutionData.m_lastGlobalAddedIndex = m_variables.size();
+}
+std::size_t SolutionData::findOrAddStableSet(const DenseSet &t_set,
+                                             std::size_t checkNewFromIndex) {
+#ifndef NDEBUG
+   for(std::size_t i = 0; i < checkNewFromIndex; ++i) {
+      assert(m_variables[i].set() != t_set);
+   }
+#endif
+   for (std::size_t i = checkNewFromIndex; i < m_variables.size(); ++i) {
+      if (m_variables[i].set() == t_set) {
+         return i;
+      }
+   }
+   return addStableSet(t_set);
+}
+void SolutionData::syncLocalVarsWithGlobal(
+    LocalSolutionData &t_localSolutionData) {
+   std::scoped_lock guard(m_variable_mutex);
+   // First, add the local variables to the global pool.
+   writeLocalVariablesToGlobal(t_localSolutionData);
+
+// The variables up until t_localSolutionData.m_numStartGlobalVariables should
+// be in the global data on the same indices already
+#ifndef NDEBUG
+   for (std::size_t i = 0; i < t_localSolutionData.m_numStartGlobalVariables;
+        ++i) {
+      assert(m_variables[i].set() == t_localSolutionData.m_variables[i].set());
+   }
+#endif
+   // To prevent excessive copies, we copy only the variables which (may have)
+   // changed
+   t_localSolutionData.m_variables.resize(
+       t_localSolutionData.m_numStartGlobalVariables);
+   t_localSolutionData.m_variables.insert(
+       t_localSolutionData.m_variables.end(),
+       m_variables.begin() + t_localSolutionData.m_numStartGlobalVariables,
+       m_variables.end());
+// Check if the update was indeed correct
+#ifndef NDEBUG
+   assert(m_variables.size() == t_localSolutionData.m_variables.size());
+   for (std::size_t i = t_localSolutionData.m_numStartGlobalVariables;
+        i < m_variables.size(); ++i) {
+      assert(m_variables[i].set() == t_localSolutionData.m_variables[i].set());
+   }
+#endif
+
+   // Clear the residual data
+   t_localSolutionData.m_numStartGlobalVariables = t_localSolutionData.m_variables.size();
+   t_localSolutionData.m_variable_mapping.clear();
+}
+void SolutionData::writeLocalVarsToGlobal(
+    LocalSolutionData &t_localSolutionData) {
+   // Synchronize variables
+   {
+      std::scoped_lock guard(m_variable_mutex);
+      writeLocalVariablesToGlobal(t_localSolutionData);
+   }
+   // Transform local solutions to global ones and add them
+
+   if (t_localSolutionData.m_solutions.empty()) {
+      return;
+   }
+   for (auto &solution : t_localSolutionData.m_solutions) {
+      for (auto &var_index : solution) {
+         if (var_index >= t_localSolutionData.m_numStartGlobalVariables) {
+            var_index = t_localSolutionData.m_variable_mapping[var_index - t_localSolutionData.m_numStartGlobalVariables];
+         }
+      }
+   }
+   // move solutions to global solution pool
+
+   std::size_t minSize = t_localSolutionData.m_solutions[0].size();
+   std::size_t minColIndex = m_colorings.size();
+   bool incumbentChanged = false;
+   {
+      std::scoped_lock guard(m_upperBound_mutex);
+      for (const auto &coloring : t_localSolutionData.m_solutions) {
+         if (coloring.size() < minSize) {
+            minSize = coloring.size();
+            minColIndex = m_colorings.size();
+         }
+         m_colorings.push_back(coloring);
+      }
+      if (minSize < m_upperBound) {
+         m_upperBound = minSize;
+         m_incumbent_index = minColIndex;
+         incumbentChanged = true;
+      }
+   }
+   if (incumbentChanged) {
+      //TODO: signal new incumbent to all threads
+      //TODO: prune B&B tree
+
+      display(std::cout);
+   }
+}
+
+void SolutionData::syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id) {
+   bool improved = false;
+   {
+      std::scoped_lock guard(m_lowerBound_mutex);
+      assert(m_processing_node_lower_bounds[worker_id].has_value());
+      if(m_processing_node_lower_bounds[worker_id]->m_fractional_lb < lbInfo.m_fractional_lb) {
+         m_processing_node_lower_bounds[worker_id]->m_fractional_lb = lbInfo.m_fractional_lb;
+      }
+      if(m_processing_node_lower_bounds[worker_id]->m_lb < lbInfo.m_lb) {
+         m_processing_node_lower_bounds[worker_id]->m_lb = lbInfo.m_lb;
+      }
+      improved = recomputeLowerBound();
+   }
+   if(improved) {
+      display(std::cout); // TODO: check for deadlocks here
+   }
+}
+bool SolutionData::recomputeLowerBound() {
+   // recompute the global lower bounds
+   double m_tree_f_lb = m_tree.fractionalLowerBound();
+   std::size_t m_tree_lb = m_tree.lowerBound();
+   // also take into account the LB's of the nodes which are currently processing
+   for (const auto &info : m_processing_node_lower_bounds) {
+      if (info.has_value()) {
+         if (info->m_fractional_lb < m_tree_f_lb) {
+            m_tree_f_lb = info->m_fractional_lb;
+         }
+         if (info->m_lb < m_tree_lb) {
+            m_tree_lb = info->m_lb;
+         }
+      }
+   }
+   return assignLB(m_tree_f_lb,m_tree_lb);
+}
+bool SolutionData::assignLB(double t_frac_lb, std::size_t t_lb) {
+   bool improved = false;
+   //B&B tree has no open nodes and no node is being processed
+   if(t_lb == std::numeric_limits<std::size_t>::max()) {
+      std::size_t upperBound = m_upperBound; //TODO: is this safe?
+      improved = m_lowerBound < upperBound;
+      m_fractionalLowerBound = upperBound ; //TODO: prevent overwriting fractional bound
+      m_lowerBound = upperBound;
+      return improved;
+   }
+   if (t_lb > m_lowerBound) {
+      m_lowerBound = t_lb;
+      improved = true;
+   }
+   m_fractionalLowerBound = std::min(m_fractionalLowerBound, t_frac_lb);
+   return improved;
+}
+void SolutionData::runBranchAndBound() {
+   initializeBBTree();
+   std::size_t numHardWareThreads = std::min(settings().numThreads(),static_cast<std::size_t>(std::thread::hardware_concurrency()));
+   m_workers.clear();
+   for(std::size_t id = 0; id < numHardWareThreads; ++id) {
+      m_workers.push_back(ColorNodeWorker(id));
+   }
+   m_processing_node_lower_bounds.resize(numHardWareThreads,std::nullopt);
+   std::atomic_bool stop_jobs = false;
+
+   std::vector<std::thread> threads;
+   for(std::size_t id = 0; id < numHardWareThreads; ++id) {
+      threads.emplace_back(&ColorNodeWorker::runLoop,&m_workers[id],std::ref(*this),std::ref(stop_jobs));
+   }
+   for(auto& thread : threads) {
+      thread.join();
+   }
+
+}
+std::optional<BBNode> SolutionData::popNextNode(ColorNodeWorker &t_nodeWorker) {
+   std::scoped_lock guard(m_lowerBound_mutex);
+   if(!m_tree.hasOpenNodes()) {
+      return std::nullopt;
+   }
+   //As this worker is currently idling, its previous node must not have had any children (otherwise the B&B tree would have had nodes available for it)
+   BBNode node = m_tree.popNextNode();
+   assert( !m_processing_node_lower_bounds[t_nodeWorker.id()].has_value());
+   m_processing_node_lower_bounds[t_nodeWorker.id()] = LowerBoundInfo(node.fractionalLowerBound(),node.lowerBound());
+   return node;
+
+
+}
+
+std::optional<BBNode>
+SolutionData::branchAndPopNode(BBNode& t_node, ColorNodeWorker &t_nodeWorker) {
+   display(std::cout);
+   std::vector<node_id> children;
+   std::scoped_lock guard(m_lowerBound_mutex);
+
+   if (t_node.status() == BBNodeStatus::BRANCHED) {
+      children = createChildren(t_node,t_nodeWorker);
+   }
+   std::optional<BBNode> node = pickNextNode(t_node,t_nodeWorker,children);
+   if(node.has_value()) {
+      m_processing_node_lower_bounds[t_nodeWorker.id()] = LowerBoundInfo(node->fractionalLowerBound(),node->lowerBound());
+   }else {
+      m_processing_node_lower_bounds[t_nodeWorker.id()] = std::nullopt;
+   }
+   //TODO: recompute lower bounds
+   return node;
+}
+std::optional<BBNode> SolutionData::pickNextNode(BBNode &t_node,
+                                    ColorNodeWorker &t_nodeWorker,
+                                    const std::vector<node_id> &children) {
+   if(!m_tree.hasOpenNodes()) {
+      return std::nullopt;
+   }
+   switch (m_settings.nodeSelectionStrategy()) {
+   default:
+   case ::NodeSelectionStrategy::BOUND:{
+      return m_tree.popNextNode();
+   }
+   case ::NodeSelectionStrategy::DFS_BOUND:{
+      if(!children.empty() && m_lowerBound == t_node.lowerBound()) {
+         std::size_t nodePos = t_nodeWorker.pickChildNode(m_settings.nodeChildSelectionStrategy(),children);
+         return m_tree.popNodeWithID(nodePos);
+      }
+      return m_tree.popNextNode();
+   }
+   case ::NodeSelectionStrategy::DFS_RESTART:
+   {
+      if(!children.empty() && t_nodeWorker.successiveChildrenProcessed() < m_settings.dfsRestartFrequency()) {
+         std::size_t nodePos = t_nodeWorker.pickChildNode(m_settings.nodeChildSelectionStrategy(),children);
+         return m_tree.popNodeWithID(nodePos);
+      }
+      return m_tree.popNextNode();
+   }
+   }
 }
 }// namespace pcog

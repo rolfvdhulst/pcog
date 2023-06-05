@@ -16,7 +16,6 @@ enum class BBNodeStatus {
    PROCESSING,
    BRANCHED, // Node was solved, and branching was performed
    CUT_OFF,  // Node was cut off e.g. the lower bound was greater than the upper
-             // bound
 };
 
 using node_id = std::size_t;
@@ -57,11 +56,13 @@ class BBNode {
    [[nodiscard]] Node firstBranchingNode() const { return m_firstBranchNode; }
    [[nodiscard]] Node secondBranchNode() const { return m_secondBranchNode; }
 
-   void updateLowerBound(double lowerBound) {
+   bool updateLowerBound(double lowerBound) {
       m_fractionalLowerBound = std::max(m_fractionalLowerBound, lowerBound);
-      m_lowerBound =
-          std::max(m_lowerBound, static_cast<std::size_t>(std::ceil(
-                                     lowerBound))); // TODO: fix conversion?
+      auto lb = static_cast<std::size_t>(std::ceil(lowerBound));// TODO: fix conversion
+      bool improved = lb > m_lowerBound;
+      m_lowerBound = improved ? lb : m_lowerBound;
+
+      return improved;
    }
    void setBranchingNodes(Node a, Node b) {
       m_firstBranchNode = a;
@@ -70,6 +71,8 @@ class BBNode {
    void setStatus(BBNodeStatus t_status) { m_status = t_status; }
    /// Check if a stable set meets the branching decisions taken for this node.
    /// Used only for debugging.
+   //TODO: sets with multiple SAME constraints can still be problematic,
+   //really need to check if set is stable in current local graph instead (Remove this function)
    [[nodiscard]] bool verifyStableSet(const DenseSet &set) const {
       for (const auto &data : m_branchingDecisions) {
          if ((data.type == BranchType::SAME &&

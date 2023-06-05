@@ -9,12 +9,12 @@
 #include "pcog/TabuColoring.hpp"
 #include "pcog/mwss/AugmentingSearch.hpp"
 #include "pcog/mwss/CombinatorialStableSet.hpp"
+#include "pcog/SolutionData.hpp"
+#include <thread>
 
 // TODO: add error handling, particularly LP-related.
 namespace pcog {
 void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
-   resetNodeStatistics();
-
    // Node preprocessing to compute focus graph and complete focus graph
    setupNode(t_node,t_solData);
 
@@ -22,7 +22,7 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
    solveLP();
    // Farkas pricing: price in new columns until lp solution is feasible
    while (m_lpSolver.status() == LPSolverStatus::INFEASIBLE) {
-      farkasPricing(t_node, t_solData);
+      farkasPricing(t_node);
    }
    // For graph coloring with ryan-foster branching the subproblem cannot be
    // infeasible, so we can ensure optimality of the lp here.
@@ -40,18 +40,16 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData) {
    computeBranchingVertices(t_node, t_solData);
    divingHeuristic(t_node,t_solData);
 
-   writeNodeStatistics(t_node,t_solData);
+   synchronizeStastistics(t_node,t_solData); //TODO: fix synchronization
 }
 
-void ColorNodeWorker::farkasPricing(BBNode &t_node, SolutionData &t_solData) {
+void ColorNodeWorker::farkasPricing(BBNode &t_node) {
    assert(m_lpSolver.status() == LPSolverStatus::INFEASIBLE);
-   const auto &stable_sets = t_solData.variables();
+   const auto &stable_sets = m_localData.variables();
    DenseSet colored_nodes(m_completeFocusGraph.numNodes());
    // color any nodes whom's constraints are not enforced in this subproblem
    // (e.g. have a SAME constraint)
 
-   // TODO: is this equivalent to the SAME node thing below? Maybe need to
-   // explicitly check LP.
    for (Node node = 0; node < m_mapToPreprocessed.oldToNewIDs.size(); ++node) {
       if (m_mapToPreprocessed.oldToNewIDs[node] == INVALID_NODE) {
          colored_nodes.add(node);
@@ -69,7 +67,7 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node, SolutionData &t_solData) {
       for (const auto &bound : upperBounds) {
          if (bound.value != 0.0) {
             colored_nodes.inplaceUnion(
-                stable_sets[bound.column].set()); // TODO: integer...
+                stable_sets[bound.column].set()); // TODO: integer conversions
          }
       }
    }
@@ -119,12 +117,12 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node, SolutionData &t_solData) {
       maximizeStableSet(computedStableSet, m_completeFocusGraph);
       assert(m_completeFocusGraph.setIsStable(computedStableSet));
       assert(m_completeFocusGraph.setIsStableMaximal(computedStableSet));
-      assert(t_solData.isNewSet(computedStableSet));
+      assert(m_localData.isNewSet(computedStableSet));
       assert(t_node.verifyStableSet(computedStableSet));
       pricedSets.push_back(computedStableSet);
    }
    // Add new columns and resolve LP
-   addColumns(pricedSets, t_solData);
+   addColumns(pricedSets);
    solveLP();
 }
 void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool duringDiving) {
@@ -156,7 +154,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
    }
 }
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
-                                               const SolutionData &t_solData) {
+                                               SolutionData &t_solData) {
    //TODO: divide function into smaller functions
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    if(node.lowerBound() >= t_solData.upperBoundUnscaled()){
@@ -167,7 +165,7 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    auto primalSol = m_lpSolver.getPrimalSolution();
    //Get the candidate branching edges
    auto scoredEdges = getAllBranchingEdgesViolatedInBoth(
-       m_focusGraph, primalSol, t_solData.variables(),
+       m_focusGraph, primalSol, m_localData.variables(),
        m_mapToPreprocessed.oldToNewIDs);
    std::mt19937 random_device(42); //TODO: make member
 
@@ -177,13 +175,13 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
       scoreBranchingCandidates(
           scoredEdges, BranchingStrategy::SMALL_DIFFERENCE, m_focusGraph,
           m_lpSolver, m_nodeToLPRow,
-          t_solData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
+          m_localData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
       std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
       std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
       const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
       auto best_it = selectBestPair(scoredEdges,t_solData.settings().candidateSelectionStrategy(),
-                                    primalSol,focusToPreprocessed,t_solData.variables());
+                                    primalSol,focusToPreprocessed,m_localData.variables());
       assert(best_it != scoredEdges.end());
       assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
       //TODO: how to sort/choose between node1 /node2?
@@ -227,17 +225,17 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    }
 
    //Score them according to some function
+   std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
    scoreBranchingCandidates(
        scoredEdges, t_solData.settings().branchingStrategy(), m_focusGraph,
        m_lpSolver, m_nodeToLPRow,
-       t_solData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
-   std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
+       m_localData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
    std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
    //Select pair, checking if they are violated in both branches
    const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
    auto best_it = selectBestPair(scoredEdges,t_solData.settings().candidateSelectionStrategy(),
-                  primalSol,focusToPreprocessed,t_solData.variables());
+                  primalSol,focusToPreprocessed,m_localData.variables());
    assert(best_it != scoredEdges.end());
    assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
    //TODO: how to sort/choose between node1 /node2?
@@ -287,22 +285,21 @@ void ColorNodeWorker::maximizeStableSet(DenseSet &t_set,
    assert(t_graph.setIsStable(t_set));
    assert(t_graph.setIsStableMaximal(t_set));
 }
-void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets,
-                                 SolutionData &t_solData) {
-   assert(t_solData.variables().size() == m_lpSolver.numCols());
+void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets) {
+   assert(m_localData.variables().size() == m_lpSolver.numCols());
 
    // First add the columns to our internal storage
    for (const auto &set : sets) {
-      assert(t_solData.isNewSet(set));
+      assert(m_localData.isNewSet(set));
       assert(set.capacity() == m_completeFocusGraph.numNodes());
-      t_solData.addStableSet(set);
+      m_localData.addStableSet(set);
    }
-   addColumnsToLP(sets,t_solData);
+   addColumnsToLP(sets);
 }
 PricingResult ColorNodeWorker::priceColumn(BBNode &node,
                                            SolutionData &t_solData,
                                            bool duringDiving) {
-   ++m_numPricingIterations;
+   m_localData.addPricingIteration();
    // Get dual weights and make them numerically safe
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    assert(m_lpSolver.numRows() == m_focusGraph.numNodes());
@@ -311,14 +308,6 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    for (const auto &row : dual_values) {
       dualSolution[m_LPRowToNode[row.column]] = row.value;
    }
-//  if(!duringDiving){
-//         double dualSum = std::accumulate(dualSolution.begin(), dualSolution.end(), 0.0);
-//         double test = fabs(dualSum - m_lpSolver.objective());
-//         assert(test <= 1e-8);
-//         // TODO: check why the dual solution is not equal... how? How to
-//         // query dual variable bounds?
-//         // Only breaks when variable upper bounds are 1.0 for DSJC125.9
-//  }
 
    // round up weights to prevent negative dual_values
    for (auto &dual : dualSolution) {
@@ -385,7 +374,6 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       }
       m_mwssSolver->setUserData(this);
       m_mwssSolver->setCallback(lambda);
-      m_colorSolver = &t_solData;
 
       m_mwssSolver->run();
       solvedOptimally = !m_mwssSolver->stoppedBeforeOptimality();
@@ -397,7 +385,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    const auto &map = m_mapToPreprocessed.oldToNewIDs;
    std::vector<DenseSet> newSets;
    for (auto &set : m_pricedVariables) {
-      if (t_solData.isNewSet(set)) {
+      if (m_localData.isNewSet(set)) {
          DenseSet focusSet(m_focusGraph.numNodes());
          map.transform(set, focusSet);
          SafeDualWeights::weight_type maxPricingValue =
@@ -419,6 +407,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    }
    m_pricedVariables.clear();
    if (newSets.empty()) {
+      bool improvedLB = false;
       if (!duringDiving && solvedOptimally) {
          SafeDualWeights::weight_type weightSum = dualWeights.fullCost();
          RoundingMode mode = fegetround();
@@ -427,15 +416,15 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
          safeLowerBound /= dualWeights.scale();
          fesetround(mode);
          assert(m_lpSolver.objective() >= safeLowerBound);
-         node.updateLowerBound(safeLowerBound);
+         improvedLB = node.updateLowerBound(safeLowerBound);
       }
 
-      if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBoundUnscaled()){
-         writeNodeStatistics(node,t_solData);
+      if(node.depth() == 0 && improvedLB){
+         synchronizeStastistics(node,t_solData);
       }
       return PricingResult::NO_COLUMNS;
    }
-
+   bool improvedLB = false;
    if(!duringDiving && solvedOptimally){
       RoundingMode mode = fegetround();
       fesetround(FE_UPWARD);
@@ -447,15 +436,15 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       fesetround(mode);
       assert(m_lpSolver.objective() >= derivedLowerBound);
 
-      node.updateLowerBound(derivedLowerBound);
+      improvedLB = node.updateLowerBound(derivedLowerBound);
    }
    //Ensure we keep the solution data up to date if we improve the global lower bound (e.g. we are in the root node).
    //For now, the case where we are not in the root node but improve the global bound is handled by b&b code itself,
    //but here we need to notify the pricing system somehow
-   if(node.depth() == 0 && node.lowerBound() > t_solData.lowerBoundUnscaled()){
-      writeNodeStatistics(node,t_solData);
+   if(node.depth() == 0 && improvedLB ){
+      synchronizeStastistics(node,t_solData);
    }
-   addColumns(newSets, t_solData);
+   addColumns(newSets);
    return PricingResult::FOUND_COLUMN; // TODO: pick up on abort here
 }
 void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
@@ -475,7 +464,7 @@ void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
    assert(m_completeFocusGraph.setIsStable(original_space_set));
    assert(m_completeFocusGraph.setIsStableMaximal(original_space_set));
 
-   bool is_new_set = m_colorSolver->isNewSet(original_space_set);
+   bool is_new_set = m_localData.isNewSet(original_space_set);
    if (!is_new_set) {
       return;
    }
@@ -491,19 +480,19 @@ void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
 void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
 
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
-   double cutOffBound = static_cast<double>(t_solData.upperBoundUnscaled())-1.0;
+   double cutOffBound = static_cast<double>(t_solData.upperBoundUnscaled())-1.0; //TODO: fix global access
    if(m_lpSolver.objective() >= cutOffBound + t_solData.settings().roundingTolerance()){
       return;
    }
    const auto& focusGraph = m_focusGraph;
    const auto& preprocessedToFocus = m_mapToPreprocessed.oldToNewIDs;
    const auto& preprocessedGraph = t_solData.preprocessedGraph();
-   const auto& variables = t_solData.variables();
+   const auto& variables = m_localData.variables();
    auto LPsol = m_lpSolver.getPrimalSolution();
    assert(!LPsol.empty());
 
    struct PartialSolVar{
-      PartialSolVar(std::size_t n) : index{INVALID_NODE},value{0.0},projectedSet(n){};
+      explicit PartialSolVar(std::size_t n) : index{INVALID_NODE},value{0.0},projectedSet(n){};
       std::size_t index;
       double value;
       DenseSet projectedSet;
@@ -514,6 +503,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
       projectedSolution[i].index = LPsol[i].column;
       preprocessedToFocus.transform(variables[LPsol[i].column].set(),projectedSolution[i].projectedSet);
       if(!focusGraph.setIsStable(projectedSolution[i].projectedSet)){
+         std::cout<<"Set not stable in graph?"<<"\n";
          if(!preprocessedGraph.setIsStable(variables[projectedSolution[i].index].set())){
             std::cout<<"set not stable in original??"<<std::endl;
          }
@@ -553,35 +543,29 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData) {
          for(const auto& elem : color_indices){
             indices.emplace_back(elem->index);
          }
-         //we synchronize data so it looks nice when we display
-         addSolution(indices,node,t_solData,true);
+         addSolution(indices,node,t_solData,true); //TODO: fix global soldata call
       }else{
          // Need to repair the solution.
          // In this case we need to add columns which are also valid in the current node
          // TODO: somehow try minimizing the # of added columns
          SetColoring setColoring;
          for(const auto& var : color_indices){
-
             long index = std::distance(projectedSolution.cbegin(),var);
             setColoring.addColor(projectedSolCopy[index].projectedSet);
          }
+         assert(setColoring.isValid(m_focusGraph));
          NodeColoring coloring(m_focusGraph.numNodes(),setColoring);
          NodeColoring newColoring = extendColoring(coloring,m_mapToPreprocessed,m_completeFocusGraph);
 
          SetColoring fixedColoring(newColoring);
-         std::size_t before = t_solData.variables().size();
+         assert(fixedColoring.isValid(m_completeFocusGraph));
          std::vector<DenseSet> colors = fixedColoring.colors();
          for(auto& color : colors){
             maximizeStableSet(color,m_completeFocusGraph);
          }
-         auto indices = repairColoring(colors,t_solData);
+         auto indices = repairColoring(colors);
 
-         writeNodeStatistics(node,t_solData);
-         t_solData.addSolution(indices);
-         std::size_t after = t_solData.variables().size();
-         std::cout<<fixedColoring.numColors()<<"-coloring repaired, " <<after -before <<" new stable sets\n";
-         //improvementHeuristic(indices,node,t_solData);//TODO: fix LP problems coming from bad columns entering LP?
-         //how to do this; repair one at a time?
+         addSolution(indices,node,t_solData,true); //Currently we have already added the 'repaired' columns to the LP; we probably want to only do this if the solution is 'worth saving'
       };
    }
 
@@ -623,27 +607,25 @@ LPBasis ColorNodeWorker::fixLPBasis(const SmallBasis &basis,
    return largeBasis;
 }
 std::vector<std::size_t>
-ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring,
-                                SolutionData &t_solData) {
-   assert(t_solData.variables().size() == m_lpSolver.numCols());
+ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring) {
+   assert(m_localData.variables().size() == m_lpSolver.numCols());
 
-   std::size_t oldIndex = t_solData.variables().size();
+   std::size_t oldIndex = m_localData.variables().size();
    std::vector<std::size_t> colorIndices;
    std::vector<DenseSet> toAddSets;
    // First add the columns to our internal storage
    for (const auto &set : coloring) {
-      std::size_t index = t_solData.findOrAddStableSet(set);
+      std::size_t index = m_localData.findOrAddStableSet(set);
       colorIndices.push_back(index);
       if(index >= oldIndex){
          toAddSets.push_back(set);
       }
    }
-   addColumnsToLP(toAddSets,t_solData);
+   addColumnsToLP(toAddSets);
    solveLP(); //TODO: why are we resolving LP here?
    return colorIndices;
 }
-void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
-                                     SolutionData &t_solData) {
+void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets) {
    // Add the columns to the LP
    // Adding all columns at once actually turns out to be slower, as we typically only add a few columns during pricing.
    // Thus, we add one column at a time.
@@ -657,11 +639,10 @@ void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets,
             colRows.emplace_back(node, 1.0);
          }
       }
-      m_lpSolver.addColumn(
-          colRows, 1.0, 0.0,
-          soplex::infinity); // TODO: upper bound option
+      double upperBound = m_completeFocusGraph.setIsStable(set) ? soplex::infinity : 0.0;
+      m_lpSolver.addColumn(colRows, 1.0, 0.0, upperBound);
    }
-   assert(t_solData.variables().size() == m_lpSolver.numCols());
+   assert(m_localData.variables().size() == m_lpSolver.numCols());
 }
 void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
    const int frequency = t_solData.settings().divingFrequency();
@@ -690,7 +671,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
    double beta = 2.0; //parameter for weighing importance of columns
    DenseSet coveredNodes(m_focusGraph.numNodes());
    DenseSet varSet(m_focusGraph.numNodes());
-   const auto& vars = t_solData.variables();
+   const auto& vars = m_localData.variables();
 
    bool solution_found = false;
    while(true){
@@ -752,13 +733,13 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
       }
 
       DenseSet originalUncolored(m_completeFocusGraph.numNodes(),true);
-      const auto& variables = t_solData.variables();
+      const auto& variables = m_localData.variables();
       for(const auto& index : indices){
          originalUncolored.inplaceDifference(variables[index].set());
       }
       if(originalUncolored.empty()) {
          // no need to repair
-         addSolution(indices,t_node,t_solData,true);
+         addSolution(indices,t_node,t_solData,true); //TODO: fix upper bound
       }else{
          std::cout<<"Could not repair diving solution : "<<m_lpSolver.objective()<<"\n";
       }
@@ -772,37 +753,15 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData) {
    if(!doColumnGeneration){
       m_lpSolver.setObjectiveUpperLimit(soplex::infinity);
    }
-//   m_lpSolver.setIntegralityPolishing(false);
+//   m_lpSolver.setIntegralityPolishing(false); //TODO: check if we need to set/unset this or if this matters at all
 
 }
-void ColorNodeWorker::processNextNode(SolutionData &t_solData) {
-   //TODO: somehow refactor to have cleaner interface for updating the global solution data and this needing to be done less often.
-   BBNode bb_node = chooseNextNode(t_solData);
 
-   processNode(bb_node,t_solData);
-   // TODO: check for time limit in processNode and return true/false based on hitting time limits or not
-
-   if (bb_node.status() == BBNodeStatus::BRANCHED) {
-      m_childNodes = t_solData.createChildren(bb_node,*this);
-   }else{
-      m_childNodes = {};
-   }
-   //Re-check the lower bounds from the trees
-   t_solData.updateTreeBounds();
-}
-void ColorNodeWorker::resetNodeStatistics() {
-   m_numLPIterations = 0;
-   m_numPricingIterations = 0;
-}
-void ColorNodeWorker::writeNodeStatistics(BBNode& t_node, SolutionData &t_data) {
-   t_data.addLPIterations(m_numLPIterations);
-   t_data.addPricingIterations(m_numPricingIterations);
-   m_numLPIterations = 0;
-   m_numPricingIterations = 0;
-
+void ColorNodeWorker::synchronizeStastistics(BBNode& t_node, SolutionData &t_data) {
+   t_data.synchronizeLocalDataStatistics(m_localData);
    if(t_node.depth() == 0){
-      t_data.updateFractionalLowerBound(t_node.fractionalLowerBound());
-      t_data.updateLowerBound(t_node.lowerBound());
+      LowerBoundInfo info(t_node.fractionalLowerBound(), t_node.lowerBound());
+      t_data.syncLocalLowerBound(info,m_worker_id);
    }
 
 }
@@ -811,11 +770,10 @@ bool ColorNodeWorker::solveLP() {
    m_lpSolver.markAllColumnsIntegral();
 
    bool status = m_lpSolver.solve();
-   m_numLPIterations += m_lpSolver.numIterations();
+   m_localData.addLPIterations(m_lpSolver.numIterations());
    return status;
 }
-void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node,
-                                         const SolutionData &t_solData) {
+void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node) {
    m_lpSolver.clear();
 
    m_lpSolver.setIntegralityPolishing(true);
@@ -832,7 +790,7 @@ void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node,
    std::vector<double> objectives;
    std::vector<double> lbs;
    std::vector<double> ubs;
-   for (const auto &variable : t_solData.variables()) {
+   for (const auto &variable : m_localData.variables()) {
       std::vector<ColElem> columnEntries;
       for (const auto &node : variable.set()) {
          auto index = m_mapToPreprocessed
@@ -850,18 +808,7 @@ void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node,
       if(!m_completeFocusGraph.setIsStable(set)){
          upperBound = 0.0;
       }
-      //TODO: below doesn't work, probably because of SAME constraints
-//      for (const auto &decision : bb_node.branchDecisions()) {
-//         // Check if the stable set is viable in the Subproblem
-//         if ((decision.type == BranchType::DIFFER &&
-//              set.contains(decision.first) && set.contains(decision.second)) ||
-//             (decision.type == BranchType::SAME &&
-//              (set.contains(decision.first) !=
-//               set.contains(decision.second)))) {
-//            upperBound = 0.0;
-//            break;
-//         }
-//      }
+
       entries.push_back(columnEntries);
       objectives.push_back(1.0);
       lbs.push_back(0.0);
@@ -876,6 +823,7 @@ void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node,
    }
 }
 void ColorNodeWorker::setupNode(BBNode &node, const SolutionData &solver) {
+   bool isChildNode = node.parent() == m_focusNode;
    if(node.depth() == 0){
       // For the root node; simply copy
       m_completeFocusGraph = solver.preprocessedGraph();
@@ -883,28 +831,29 @@ void ColorNodeWorker::setupNode(BBNode &node, const SolutionData &solver) {
       m_mapToPreprocessed =
           PreprocessedMap({},{}, NodeMap::identity(m_focusGraph.numNodes()),
                           NodeMap::identity(m_focusGraph.numNodes()));
-      setupLPFromScratch(node,solver);
-   }else if(node.parent() == m_focusNode ){
-      //We can more efficiently initialize child nodes, as we already have
-      //the graphs and the LP in memory which are 'almost' correct,
-      //which means we can skip some work
-
-      auto completeGraph =
-          constructBranchedFullGraphFromChild(m_completeFocusGraph,
-                                              node.branchDecisions(),
-                                              node.getNumAddedBranchingDecisions());
-      m_completeFocusGraph = completeGraph;
-      auto result = preprocessedGraphFromChild(m_focusGraph,
-                                               node.branchDecisions(),
-                                               node.getNumAddedBranchingDecisions(),
-                                               m_mapToPreprocessed.oldToNewIDs,
-                                               node.lowerBound());
-
-      m_focusGraph = result.graph;
-      m_mapToPreprocessed.extend(result.map);
-//      setupLPFromScratch(node,solver);
-      setupChildLP(node,solver,result.map);
-   }else{
+      setupLPFromScratch(node);
+   }
+//   else if(isChildNode){ //TODO: fix with multithreading initialization
+//      //We can more efficiently initialize child nodes, as we already have
+//      //the graphs and the LP in memory which are 'almost' correct,
+//      //which means we can skip some work
+//
+//      auto completeGraph =
+//          constructBranchedFullGraphFromChild(m_completeFocusGraph,
+//                                              node.branchDecisions(),
+//                                              node.getNumAddedBranchingDecisions());
+//      m_completeFocusGraph = completeGraph;
+//      auto result = preprocessedGraphFromChild(m_focusGraph,
+//                                               node.branchDecisions(),
+//                                               node.getNumAddedBranchingDecisions(),
+//                                               m_mapToPreprocessed.oldToNewIDs,
+//                                               node.lowerBound());
+//
+//      m_focusGraph = result.graph;
+//      m_mapToPreprocessed.extend(result.map);
+//      setupChildLP(node,solver,result.map);
+//   }
+   else{
       // When not a child node, we do not bother with a scheme to attempt to 'rollback' changes;
       // this is likely to be more pain than it is worth
 
@@ -915,7 +864,7 @@ void ColorNodeWorker::setupNode(BBNode &node, const SolutionData &solver) {
       m_completeFocusGraph = completeGraph;
       m_focusGraph = result.graph;
       m_mapToPreprocessed = result.map;
-      setupLPFromScratch(node,solver);
+      setupLPFromScratch(node);
    }
 
    m_focusNode = node.id();
@@ -927,7 +876,7 @@ void ColorNodeWorker::setupNode(BBNode &node, const SolutionData &solver) {
 
        auto bounds = m_lpSolver.columnUpperBounds();
 
-       const auto& vars = solver.variables();
+       const auto& vars = m_localData.variables();
        assert(bounds.size() == vars.size());
        for(std::size_t i = 0; i < bounds.size(); ++i){
          if(bounds[i].value == 0.0){
@@ -984,48 +933,14 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
       m_lpSolver.setBasis(basis);
    }
 }
-BBNode && ColorNodeWorker::chooseChildNode(SolutionData& t_solData, std::size_t t_nodePos){
-   ++m_successiveChildNodesProcessed;
-   return t_solData.popNodeWithID(t_nodePos);
-}
-BBNode && ColorNodeWorker::chooseBestNode(SolutionData& t_solData){
-   m_successiveChildNodesProcessed = 0;
-   return t_solData.popNextNode();
-}
 
-BBNode&& ColorNodeWorker::chooseNextNode(SolutionData &t_solData) {
-   switch (t_solData.settings().nodeSelectionStrategy()) {
-   case ::NodeSelectionStrategy::BOUND:{
-      return chooseBestNode(t_solData);
-   }
-   case ::NodeSelectionStrategy::DFS_BOUND:{
-      if(!m_childNodes.empty()){
-         std::size_t nodePos = pickChildNode(t_solData.settings().nodeChildSelectionStrategy(),m_childNodes);
-         std::size_t nodeLowerBound = t_solData.peekNode(nodePos).lowerBound();
-         if(t_solData.lowerBound() == nodeLowerBound){
-            return chooseChildNode(t_solData,nodePos);
-         }
-      }
-      return chooseBestNode(t_solData);
-   }
-   case ::NodeSelectionStrategy::DFS_RESTART:
-   {
-      if(!m_childNodes.empty() && m_successiveChildNodesProcessed != t_solData.settings().dfsRestartFrequency()){
-         std::size_t nodePos = pickChildNode(t_solData.settings().nodeChildSelectionStrategy(),m_childNodes);
-         return chooseChildNode(t_solData,nodePos);
-      }
-      m_successiveChildNodesProcessed = 0;
-      return t_solData.popNextNode();
-   }
-   }
 
-}
 void ColorNodeWorker::improvementHeuristic(const std::vector<std::size_t>& solVarIndices,
                                            BBNode &t_node,
                                            SolutionData &t_solData) {
 
    const auto& preprocessedGraph = t_solData.preprocessedGraph();
-   const auto& variables = t_solData.variables();
+   const auto& variables = m_localData.variables();
    SetColoring initialColoring;
    for(const auto& index : solVarIndices){
       initialColoring.addColor(variables[index].set());
@@ -1036,7 +951,7 @@ void ColorNodeWorker::improvementHeuristic(const std::vector<std::size_t>& solVa
    NodeColoring searchColoring(preprocessedGraph.numNodes(),initialColoring);
    NodeColoring bestColoring = searchColoring;
 
-   std::size_t lb = t_solData.lowerBound();
+   std::size_t lb = t_solData.lowerBound(); //TODO: rewrite bound checks
    std::size_t ub = t_solData.upperBound();
    TabuColoring tabuAlgorithm(preprocessedGraph);
    while( lb <= numSearchColors) {
@@ -1064,27 +979,25 @@ void ColorNodeWorker::improvementHeuristic(const std::vector<std::size_t>& solVa
    }
    //Add best coloring if it was improved
    if(bestColoring.numColors() < initialColoring.numColors()){
-      std::cout<<"Improved "<<initialColoring.numColors()<<"-coloring into a "<< bestColoring.numColors()<<"-coloring\n";
-
+      //std::cout<<"Improved "<<initialColoring.numColors()<<"-coloring into a "<< bestColoring.numColors()<<"-coloring\n";
       SetColoring bestSetColoring(bestColoring);
       for(auto& color : bestSetColoring.colors()) {
          maximizeStableSet(color,preprocessedGraph);
       }
 
-      std::vector<std::size_t> indices = repairColoring(bestSetColoring.colors(),t_solData);
-      addSolution(indices,t_node,t_solData,false);
+      std::vector<std::size_t> indices = repairColoring(bestSetColoring.colors());
+      addSolution(indices,t_node,t_solData,false); //TODO: fix
    }
 
 }
 void ColorNodeWorker::addSolution(const std::vector<std::size_t>& indices,
                                   BBNode& t_node,
                                   SolutionData& t_solData,
-                                  bool doImprovements) {
-   writeNodeStatistics(t_node,t_solData);
-   t_solData.addSolution(indices);
+                                  bool doImprovements) { //TODO: fix this function w.r.t. global data and how to update/signal
+   synchronizeStastistics(t_node,t_solData); //TODO: only synchronize statistics when improving solution is found
 
    if(doImprovements){
-      //improvementHeuristic(indices,t_node,t_solData);
+      improvementHeuristic(indices,t_node,t_solData);
    }
 }
 std::size_t
@@ -1101,6 +1014,25 @@ ColorNodeWorker::pickChildNode(NodeChildSelectionStrategy strategy,
       return children[dist(m_random_engine)];
    }
    }
+}
+void ColorNodeWorker::runLoop(SolutionData &t_soldata, std::atomic_bool& stop) {
+   while(!stop){
+      //we pop the node with best bound when the thread has been idling.
+      //This can only happen if the thread did no work or if the last node was cut off
+      std::optional<BBNode> node = t_soldata.popNextNode(*this);
+      while(!stop && node.has_value()){
+         processNode(node.value(),t_soldata);
+         //TODO: synchronize statistics, ub, and finished node to global data
+         //Synchronizes LB data and updates branch and bound tree. Also immediately installs a new node if one exists
+         node = t_soldata.branchAndPopNode(node.value(),*this);
+      }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      //TODO: can probably wait using condition variables or something smarter which notifies threads that new B&B nodes have arrived
+   }
+}
+std::size_t ColorNodeWorker::successiveChildrenProcessed() const {
+   return m_successiveChildNodesProcessed;
 }
 
 } // namespace pcog

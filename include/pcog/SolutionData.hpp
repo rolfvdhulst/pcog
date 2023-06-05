@@ -10,17 +10,12 @@
 #include "BBNode.hpp"
 #include "pcog/utilities/DenseGraph.hpp"
 #include "pcog/utilities/DenseSet.hpp"
+#include "pcog/ColorNodeWorker.hpp"
+#include "LocalSolutionData.hpp"
 #include "Preprocessing.hpp"
 #include "Settings.hpp"
 
 namespace pcog {
-class StableSetVariable{
- public:
-   explicit StableSetVariable(DenseSet set) : m_set{std::move(set)}{};
-   [[nodiscard]] const DenseSet& set() const { return m_set;}
- private:
-   DenseSet m_set;
-};
 
 /// Class which holds the data produced during a solve of the graph.
 /// This data can have frequent reads and writes from multiple threads
@@ -36,37 +31,28 @@ class SolutionData {
    [[nodiscard]] const NodeMap& originalToPreprocessed() const;
 
    void doPresolve();
+   void runBranchAndBound();
 
-   void initializeBBTree();
 
    [[nodiscard]] const std::vector<StableSetVariable>& variables() const;
    [[nodiscard]] bool isNewSet(const DenseSet& t_set) const;
    std::size_t addStableSet(DenseSet t_set);
-   std::size_t findOrAddStableSet(const DenseSet& t_set);
+   std::size_t findOrAddStableSet(const DenseSet& t_set, std::size_t checkNewFromIndex = 0);
 
    void addSolution(std::vector<std::size_t> t_stable_set_indices);
 
-   [[nodiscard]] std::size_t upperBoundUnscaled() const;
-   [[nodiscard]] std::size_t lowerBoundUnscaled() const;
+   [[nodiscard]] std::size_t upperBoundUnscaled() ;
+   [[nodiscard]] std::size_t lowerBoundUnscaled() ;
 
-   [[nodiscard]] std::size_t upperBound() const;
-   [[nodiscard]] std::size_t lowerBound() const;
-   [[nodiscard]] double fractionalLowerBound() const;
+   [[nodiscard]] std::size_t upperBound() ;
+   [[nodiscard]] std::size_t lowerBound() ;
+   [[nodiscard]] double fractionalLowerBound();
    [[nodiscard]] SetColoring incumbentUnscaled() const;
    [[nodiscard]] NodeColoring incumbent() const;
 
-   //These functions should only be called either during (or before) processing of the root node,
-   //or after a node has been solved and we evaluate the b&b tree
-   void updateLowerBound(std::size_t t_lb); //Note the lower bounds are wtihout the offset from the presolving of the root node!
-   void updateFractionalLowerBound(double t_fractional_lb);
-   void updateTreeBounds();
-
-   [[nodiscard]] const BBNode& peekNode(node_id id) const; //peek at the given node
-   BBNode&& popNextNode();
-   BBNode &&popNodeWithID(node_id id);
-
+   std::optional<BBNode> popNextNode(ColorNodeWorker& t_nodeWorker);
+   std::optional<BBNode> branchAndPopNode(BBNode& node, ColorNodeWorker& t_nodeWorker);
    std::vector<node_id> createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
-
    [[nodiscard]] std::size_t numProcessedNodes() const;
    [[nodiscard]] std::size_t numOpenNodes() const;
    [[nodiscard]] bool hasOpenNodes() const;
@@ -79,39 +65,60 @@ class SolutionData {
    [[nodiscard]] bool checkNodeLimitHit() const;
 
    [[nodiscard]] const Settings& settings() const;
+
    void displayHeader(std::ostream& t_stream) const;
    void display(std::ostream& t_stream);
 
-   void addPricingIterations(std::size_t count);
-   void addLPIterations(std::size_t count);
+   void synchronizeLocalDataStatistics(LocalSolutionData& t_localData);
+   void writeLocalVarsToGlobal(LocalSolutionData& t_localSolutionData);
+   void syncLocalVarsWithGlobal(LocalSolutionData& t_localSolutionData);
+   void syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id);
  private:
+   void initializeBBTree();
+   std::optional<BBNode> pickNextNode(BBNode& t_node, ColorNodeWorker &t_nodeWorker, const std::vector<node_id>& children);
+   void writeLocalVariablesToGlobal(LocalSolutionData& t_localSolutionData);
+
+   //Recomputes the lower bound based on the tree and worker info.
+   //It's your responsibility to lock the mutex before calling these two functions (hence private!)
+   //Returns true if the lower bound was improved
+   bool recomputeLowerBound();
+   bool assignLB(double t_frac_lb, std::size_t t_lb);
+
    // Original Problem data
    DenseGraph m_originalGraph;
    // Problem after presolving.
    DenseGraph m_preprocessedGraph;
    PreprocessedMap m_preprocessedToOriginal;
 
-   // Shared solution data, not constant. The variables constraints and colorings are in terms of the preprocessed graph.
+   // Shared solution data, not constant. The variables, constraints and colorings are in terms of the preprocessed graph.
+   std::mutex m_variable_mutex;
    std::vector<StableSetVariable> m_variables;
    // upper bound info
+   std::mutex m_upperBound_mutex;
    std::vector<std::vector<std::size_t>> m_colorings;
    std::size_t m_incumbent_index;
-   std::size_t m_upperBound;
-   // lower bound info; //TODO: track or query?
+   std::atomic_size_t m_upperBound; //This is atomic because the worker threads access them from time to time but it is unlikely to be updated much.
+                                    //Putting it into the Mutex would likely be slower
+
+   std::vector<ColorNodeWorker> m_workers; //Worker threads which execute the branch& price loop for a single node
+
+   // lower bound info
+   std::mutex m_lowerBound_mutex; //This mutex is locked whenever the B&B tree or the lower bound changes
+   std::vector<std::optional<LowerBoundInfo>> m_processing_node_lower_bounds; //The lower bounds of the nodes which are currently being processed
    std::size_t m_lowerBound;
    double m_fractionalLowerBound;
-   //TODO: maybe add lower bound certificates in form of clique / mycielski graphs here
-
    BBTree m_tree;
+   //TODO: maybe add lower bound certificates in form of clique / mycielski graphs here
 
    std::chrono::high_resolution_clock::time_point m_start_solve_time;
 
    //printing options
+   std::mutex m_printing_mutex;
    int m_printheader_counter;
 
    Settings& m_settings;
-   std::size_t m_lpIterations;
-   std::size_t m_pricingIterations;
+   std::atomic_size_t m_lpIterations;
+   std::atomic_size_t m_pricingIterations;
 };
 }
 #endif // PCOG_SOLUTIONDATA_HPP

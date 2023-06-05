@@ -67,22 +67,35 @@ SolverStatus ColorSolver::presolve() {
 void ColorSolver::branchAndBound() {
    auto time_start = std::chrono::high_resolution_clock::now();
    setStatus(SolverStatus::SOLVING);
-   m_solData.initializeBBTree();
-   // Branch-and-bound loop
-   while (m_solData.hasOpenNodes()) {
-
-      m_worker.processNextNode(m_solData);
-
-      if (m_solData.checkNodeLimitHit() ||
-          m_solData.checkTimelimitHit()) {
-         break;
-      }
-      //Display every n'th node and the root node
-      if(m_solData.numProcessedNodes() == 1  ||
-          m_solData.numProcessedNodes() % m_settings.nodeDisplayFrequency() == 0 ){
-         m_solData.display(std::cout);
-      }
-   }
+   m_solData.runBranchAndBound();
+//   m_workers = std::vector<ColorNodeWorker>(numHardWareThreads);
+//   // Branch-and-bound loop
+//   while (m_solData.hasOpenNodes()) {
+//      std::size_t numThreads = std::min(m_solData.numOpenNodes(),numHardWareThreads);
+//      // TODO: smartly pick so that workers are given child nodes as jobs
+//      if(numThreads == 0){ //TODO: change to 1
+//         m_workers[0].processNextNode(m_solData);
+//      }else{
+//         std::vector<std::thread> threads;
+//         for(std::size_t i = 0; i < numThreads; ++i){
+//            //TODO: prevent launching new thread every time.
+//         }
+//         for(auto& thread : threads){
+//            thread.join();
+//         }
+//      }
+//
+//
+//      if (m_solData.checkNodeLimitHit() ||
+//          m_solData.checkTimelimitHit()) {
+//         break;
+//      }
+//      //Display every n'th node and the root node
+//      if(m_solData.numProcessedNodes() == 1  ||
+//          m_solData.numProcessedNodes() % m_settings.nodeDisplayFrequency() == 0 ){
+//         m_solData.display(std::cout);
+//      }
+//   }
    auto time_end = std::chrono::high_resolution_clock::now();
    m_statistics.m_branch_and_bound_time = std::chrono::duration<double>(time_end - time_start);
    // TODO: be careful with termination from time limit in processNode before
