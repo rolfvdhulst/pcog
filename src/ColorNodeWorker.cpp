@@ -176,7 +176,7 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
           scoredEdges, BranchingStrategy::SMALL_DIFFERENCE, m_focusGraph,
           m_lpSolver, m_nodeToLPRow,
           m_localData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
-      std::shuffle(scoredEdges.begin(),scoredEdges.end(),random_device);
+      std::shuffle(scoredEdges.begin(),scoredEdges.end(),m_random_engine);
       std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
       const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
