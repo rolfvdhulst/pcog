@@ -84,6 +84,7 @@ class BBNode {
       }
       return true;
    }
+   SmallBasis& mutableBasis();
    [[nodiscard]] SmallBasis basis() const;
 
    void setBasis(SmallBasis basis);

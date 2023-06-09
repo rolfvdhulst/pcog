@@ -142,4 +142,5 @@ std::size_t BBNode::getNumAddedBranchingDecisions() const { return m_numAddedBra
 void BBNode::setBasis(SmallBasis basis) {
    m_initialBasis = std::move(basis);
 }
+SmallBasis &BBNode::mutableBasis() { return m_initialBasis; }
 } // namespace pcog

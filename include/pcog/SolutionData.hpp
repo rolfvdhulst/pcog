@@ -70,10 +70,14 @@ class SolutionData {
    void display(std::ostream& t_stream);
 
    void synchronizeLocalDataStatistics(LocalSolutionData& t_localData);
-   void writeLocalVarsToGlobal(LocalSolutionData& t_localSolutionData);
+   void writeLocalVarsToGlobal(LocalSolutionData& t_localSolutionData,std::atomic_bool& stop);
+   void writeLocalSolutionsToGlobal(LocalSolutionData& t_localSolutionData, std::atomic_bool& stop);
    void syncLocalVarsWithGlobal(LocalSolutionData& t_localSolutionData);
    void syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id);
+
+   bool doRecomputeLowerBound(std::atomic_bool& stop);
  private:
+   void pruneUpperBound(std::size_t upperBound,std::atomic_bool& stop);
    void initializeBBTree();
    std::optional<BBNode> pickNextNode(BBNode& t_node, ColorNodeWorker &t_nodeWorker, const std::vector<node_id>& children);
    void writeLocalVariablesToGlobal(LocalSolutionData& t_localSolutionData);

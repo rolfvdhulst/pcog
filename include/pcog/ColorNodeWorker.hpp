@@ -26,36 +26,55 @@ enum class PricingResult { FOUND_COLUMN, NO_COLUMNS, ABORT };
 class ColorNodeWorker {
  public:
    explicit ColorNodeWorker(std::size_t t_id)
-       : m_worker_id{t_id},
+       : m_cancelCurrentNode{false},
+         m_worker_id{t_id},
          m_focusNode{INVALID_BB_NODE},
          m_random_engine{t_id},
          m_maximizer{t_id}{};
+
+   ColorNodeWorker(const ColorNodeWorker& t_worker) :
+   m_cancelCurrentNode{bool(t_worker.m_cancelCurrentNode)},
+   m_worker_id{t_worker.m_worker_id},m_localData{t_worker.m_localData},m_lpSolver{t_worker.m_lpSolver},
+m_focusNode{t_worker.m_focusNode},m_focusGraph{t_worker.m_focusGraph},m_completeFocusGraph{t_worker.m_completeFocusGraph},
+m_mapToPreprocessed{t_worker.m_mapToPreprocessed},m_nodeToLPRow{t_worker.m_nodeToLPRow},
+m_LPRowToNode{t_worker.m_LPRowToNode}, m_childNodes{t_worker.m_childNodes},
+m_successiveChildNodesProcessed{t_worker.m_successiveChildNodesProcessed},
+m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_worker.m_pricedVariables},
+                                                      m_maximizer(t_worker.m_maximizer){};
+
+
+   void cancelNode(bool setCancelled){
+      m_cancelCurrentNode = setCancelled;
+   }
    std::size_t id() const {return m_worker_id;}
    void runLoop(SolutionData &t_soldata, std::atomic_bool& stop);
    std::size_t successiveChildrenProcessed() const;
    std::size_t pickChildNode(NodeChildSelectionStrategy strategy, const std::vector<std::size_t>& children);
 
-   LPBasis basis();
+   std::size_t mapToGlobalIndex(std::size_t localIndex) const;
    NodeMap focusToPreprocessed() const;
 
  private:
-   void processNode(BBNode &node, SolutionData &t_solver);
+   void processNode(BBNode &node, SolutionData &t_solver, std::atomic_bool& stop);
 
    /// Performs 'node preprocessing', diminishing the size of the graphs
 
-   void setupNode(BBNode &node, const SolutionData &t_soLData);
+   void setupNode(BBNode &node, SolutionData &t_soLData, std::atomic_bool& stop);
    void setupChildLP(BBNode &node, const SolutionData &t_solver,
                      const PreprocessedMap &t_childMap);
    void setupLPFromScratch(BBNode &node);
    void farkasPricing(BBNode &node);
-   void pricingLoop(BBNode &node, SolutionData &t_solver, bool duringDiving);
-   void roundingHeuristic(BBNode &node, SolutionData &t_solver);
-   void divingHeuristic(BBNode &t_node, SolutionData &t_solver);
+   void pricingLoop(BBNode &node, SolutionData &t_solver, bool duringDiving,
+                    std::atomic_bool& stop);
+   void roundingHeuristic(BBNode &node, SolutionData &t_solver, std::atomic_bool& stop);
+   void divingHeuristic(BBNode &t_node, SolutionData &t_solver, std::atomic_bool& stop);
    void improvementHeuristic(const std::vector<std::size_t> &solVarindices,
-                             BBNode &t_node, SolutionData &t_solver);
+                             BBNode &t_node, SolutionData &t_solver,
+                             std::atomic_bool& stop);
 
    void addSolution(const std::vector<std::size_t> &indices, BBNode &t_node,
-               SolutionData &t_solData, bool checkImprovements);
+               SolutionData &t_solData, bool checkImprovements,
+                    std::atomic_bool& stop);
 
    PricingResult priceColumn(BBNode &node, SolutionData &t_solver,
                              bool duringDiving);
@@ -72,6 +91,7 @@ class ColorNodeWorker {
    void addColumns(const std::vector<DenseSet> &sets);
    void addColumnsToLP(const std::vector<DenseSet> &sets);
    std::vector<std::size_t> repairColoring(const std::vector<DenseSet> &coloring);
+   std::atomic_bool m_cancelCurrentNode;
    std::size_t m_worker_id;
    LocalSolutionData m_localData;
    LPSolver m_lpSolver;

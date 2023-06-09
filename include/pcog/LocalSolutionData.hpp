@@ -23,6 +23,12 @@ struct LowerBoundInfo{
    double m_fractional_lb;
    std::size_t m_lb;
 };
+
+struct GlobalToLocalMapping{
+   std::size_t m_sameUntilIndex;
+   std::vector<std::size_t> m_globalToLocalMapping;
+   std::size_t mapGlobalToLocal(std::size_t index) const;
+};
 ///Local solution information which is synchronized with the global information.
 class LocalSolutionData{
  public:
@@ -36,8 +42,9 @@ class LocalSolutionData{
 
    void addPricingIteration();
    void addLPIterations(std::size_t numIterations);
-   void addSolution(std::vector<std::size_t> t_stable_set_indices);
-
+   void addSolution(const std::vector<std::size_t>& t_stable_set_indices);
+   [[nodiscard]] std::size_t mapToGlobalIndex(std::size_t localVarIndex) const;
+   GlobalToLocalMapping getGlobalToLocalMapping() const;
  private:
 
    std::vector<StableSetVariable> m_variables;
@@ -47,7 +54,7 @@ class LocalSolutionData{
 
    std::vector<std::size_t> m_variable_mapping;//indices the mapping of the variables local to global index
                                                 // from m_numStartGlobalVariables to m_lastGlobalAddedIndex
-   std::size_t m_lastGlobalAddedIndex; //the index of the last variable which was added to the global pool
+   std::size_t m_lastGlobalAddedIndex{}; //the index of the last variable which was added to the global pool
 
    //Solutions which were found locally
    std::vector<std::vector<std::size_t>> m_solutions;
