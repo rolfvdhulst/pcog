@@ -52,10 +52,8 @@ class SolutionData {
 
    std::optional<BBNode> popNextNode(ColorNodeWorker& t_nodeWorker);
    std::optional<BBNode> branchAndPopNode(BBNode& node, ColorNodeWorker& t_nodeWorker);
-   std::vector<node_id> createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
-   [[nodiscard]] std::size_t numProcessedNodes() const;
-   [[nodiscard]] std::size_t numOpenNodes() const;
-   [[nodiscard]] bool hasOpenNodes() const;
+   [[nodiscard]] std::size_t numProcessedNodes();
+   [[nodiscard]] std::size_t numOpenNodes();
 
    void startSolveTime();
    void reset(DenseGraph t_graph);
@@ -77,6 +75,7 @@ class SolutionData {
 
    bool doRecomputeLowerBound(std::atomic_bool& stop);
  private:
+   std::vector<node_id> createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
    void pruneUpperBound(std::size_t upperBound,std::atomic_bool& stop);
    void initializeBBTree();
    std::optional<BBNode> pickNextNode(BBNode& t_node, ColorNodeWorker &t_nodeWorker, const std::vector<node_id>& children);

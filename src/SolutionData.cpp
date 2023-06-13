@@ -296,7 +296,7 @@ void SolutionData::doPresolve() {
    NodeColoring searchColoring = initialColoring;
    NodeColoring bestColoring = initialColoring;
    TabuColoring tabuAlgorithm(m_preprocessedGraph);
-   tabuAlgorithm.setMaxIterations(100); //TODO: make parameter
+   tabuAlgorithm.setMaxIterations(100'000); //TODO: make parameter
    while( lb <= numSearchColors) {
       std::size_t removeColor = numSearchColors; //We remove the 'highest' color, but different strategies are possible
       searchColoring.setNumColors(numSearchColors);
@@ -342,14 +342,26 @@ bool SolutionData::checkNodeLimitHit() const {
 void SolutionData::initializeBBTree() {
    m_tree.createRootNode(m_preprocessedGraph.numNodes());
 }
-bool SolutionData::hasOpenNodes() const {
-   return m_tree.hasOpenNodes();
+
+std::size_t SolutionData::numOpenNodes() {
+   std::scoped_lock guard(m_lowerBound_mutex);
+   std::size_t numNodes = m_tree.numOpenNodes();
+   for(const auto& lb : m_processing_node_lower_bounds) {
+      if(lb.has_value()) {
+         numNodes++;
+      }
+   }
+   return numNodes;
 }
-std::size_t SolutionData::numOpenNodes() const {
-   return m_tree.numOpenNodes();
-}
-std::size_t SolutionData::numProcessedNodes() const {
-   return m_tree.numProcessedNodes();
+std::size_t SolutionData::numProcessedNodes() {
+   std::scoped_lock guard(m_lowerBound_mutex);
+   std::size_t numNodes = m_tree.numProcessedNodes();
+   for(const auto& lb : m_processing_node_lower_bounds) {
+      if(lb.has_value()) {
+         --numNodes;
+      }
+   }
+   return numNodes;
 }
 const std::vector<StableSetVariable> &SolutionData::variables() const {
    return m_variables;
@@ -669,6 +681,7 @@ void SolutionData::writeLocalSolutionsToGlobal(
          m_incumbent_index = minColIndex;
          incumbentChanged = true;
       }
+      t_localSolutionData.m_solutions.clear();
    }
    if (incumbentChanged) {
       pruneUpperBound(minSize,stop);

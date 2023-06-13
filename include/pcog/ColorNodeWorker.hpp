@@ -29,7 +29,7 @@ class ColorNodeWorker {
        : m_cancelCurrentNode{false},
          m_worker_id{t_id},
          m_focusNode{INVALID_BB_NODE},
-         m_random_engine{t_id},
+         m_random_engine{t_id+42},
          m_maximizer{t_id}{};
 
    ColorNodeWorker(const ColorNodeWorker& t_worker) :

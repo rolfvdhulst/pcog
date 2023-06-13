@@ -11,6 +11,7 @@
 #include "pcog/mwss/CombinatorialStableSet.hpp"
 #include "pcog/SolutionData.hpp"
 #include <thread>
+#include <soplex_interface.h>
 
 // TODO: add error handling, particularly LP-related.
 namespace pcog {
@@ -497,19 +498,21 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,st
       double value;
       DenseSet projectedSet;
    };
-   std::vector<PartialSolVar> projectedSolution(LPsol.size(),PartialSolVar(focusGraph.numNodes()));
-   for(std::size_t i = 0; i < LPsol.size(); i++){
-      projectedSolution[i].value = LPsol[i].value;
-      projectedSolution[i].index = LPsol[i].column;
-      preprocessedToFocus.transform(variables[LPsol[i].column].set(),projectedSolution[i].projectedSet);
-      if(!focusGraph.setIsStable(projectedSolution[i].projectedSet)){
-         std::cout<<"Set not stable in graph?"<<"\n"; //TODO: this happens because variables fixed to zero still enter the LP solution; somehow filter these out
-         if(!preprocessedGraph.setIsStable(variables[projectedSolution[i].index].set())){
-            std::cout<<"set not stable in original??"<<std::endl;
-         }
+   std::vector<PartialSolVar> projectedSolution;
+   projectedSolution.reserve(LPsol.size());
+   for(const auto& entry :  LPsol){
+      PartialSolVar var(focusGraph.numNodes());
+      preprocessedToFocus.transform(variables[entry.column].set(),var.projectedSet);
+      if(!focusGraph.setIsStable(var.projectedSet)){
+         //this happens because variables fixed to zero still enter the LP solution in soplex ('trickle flow')
+         assert(fabs(entry.value) < 1e-6); //we filter these out
+         continue ;
       }
-
+      var.value = entry.value;
+      var.index = entry.column;
+      projectedSolution.push_back(var);
    }
+
    DenseSet uncoloredNodes(focusGraph.numNodes(),true);
 
    std::vector<std::vector<PartialSolVar>::const_iterator> color_indices;
@@ -739,6 +742,7 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData, s
          // no need to repair
          addSolution(indices,t_node,t_solData,true,stop);
       }else{
+         //TODO: fix
          std::cout<<"Could not repair diving solution : "<<m_lpSolver.objective()<<"\n";
       }
    }
