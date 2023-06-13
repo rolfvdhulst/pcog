@@ -47,7 +47,8 @@ set_target_properties(libpcog PROPERTIES
         )
 
 find_package(SoPlex REQUIRED)
-message("Libs: " ${SOPLEX_LIBRARY} "includes: " ${SOPLEX_INCLUDE_DIRS})
+message("Libs: " ${SOPLEX_LIBRARIES} " includes: " ${SOPLEX_INCLUDE_DIRS})
+
 #Setup target
 
 include(GenerateExportHeader)
@@ -110,6 +111,8 @@ set(sources
         include/pcog/GreedyColoring.hpp
         src/TabuColoring.cpp
         include/pcog/TabuColoring.hpp
+        src/LocalSolutionData.cpp
+        include/pcog/LocalSolutionData.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

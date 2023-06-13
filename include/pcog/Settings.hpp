@@ -119,6 +119,11 @@ class Settings {
       m_nodeChildSelectionStrategy = t_strategy;
    }
    [[nodiscard]] NodeChildSelectionStrategy nodeChildSelectionStrategy() const {return m_nodeChildSelectionStrategy;}
+
+   void setNumThreads(std::size_t t_numThreads){
+      m_numMaxThreads = t_numThreads;
+   }
+   [[nodiscard]] std::size_t numThreads() const { return m_numMaxThreads;}
  private:
    std::size_t m_node_limit; /// maximal number of nodes to process
    double m_time_limit; /// maximal time in seconds to run
@@ -141,6 +146,9 @@ class Settings {
    int m_diving_pricing_frequency; /// Frequency for finding columns
 
    std::size_t m_nodeDisplayFrequency;
+
+   std::size_t m_numMaxThreads; /// Maximum # of threads to run the program on.
+                                /// We use less if the system that we are running has less threads
 };
 
 #endif // PCOG_INCLUDE_PCOG_SETTINGS_HPP

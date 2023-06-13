@@ -68,23 +68,9 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
    case BranchingStrategy::INTERSECTION_UNION_SIZE:
    {
       std::vector<std::size_t> degrees(graph.numNodes());
-      auto dual = t_lpSolver.getDualSolution();
-
       for(std::size_t i = 0; i < degrees.size(); ++i){
          degrees[i] = graph.neighbourhood(i).size();
       }
-      for(std::size_t i = 0; i < degrees.size(); ++i){
-         if(fabs(dual[i].value) < 1e-8){
-            for(const auto& node : graph.neighbourhood(i)){
-               if(degrees[node] > 0){
-                  degrees[node] -= 1;
-               }
-            }
-            degrees[i] = 0;
-         }
-      }
-
-
       for (auto &candidate : candidates) {
 
          std::size_t size_1 =  degrees[candidate.node1];

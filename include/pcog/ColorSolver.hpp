@@ -45,7 +45,6 @@ class ColorSolver {
    void displayEndResult(std::ostream& stream);
 
    SolverStatus m_status = SolverStatus::NO_PROBLEM;
-   ColorNodeWorker m_worker;
 
    //Shared data, constant
    std::string m_problemName;
