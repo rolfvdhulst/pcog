@@ -14,5 +14,6 @@ Settings::Settings()
       m_nodeChildSelectionStrategy{NodeChildSelectionStrategy::PREFER_DIFFER},
       m_dfsRestartFrequency{10}, m_rounding_tolerance{1e-8},
       m_diving_frequency{5}, m_diving_pricing_frequency{0},
-      m_nodeDisplayFrequency{50}, m_numMaxThreads{32}
+      m_nodeDisplayFrequency{50}, m_numMaxThreads{16},
+      m_numInitialTabuIterations{100'000}
       {};

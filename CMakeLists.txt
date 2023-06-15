@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 project(pcog VERSION 0.1
-        DESCRIPTION "Exact solution methods for difficult combinatorial optimization problems in graphs"
+        DESCRIPTION "Parallelized graph coloring solver"
         LANGUAGES CXX)
+set(PCOG_VERSION_MAJOR 0)
+set(PCOG_VERSION_MINOR 1)
+set(PCOG_VERSION_PATCH 0)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(utils)
@@ -57,6 +60,11 @@ set(export_file_name "export_shared.h")
 if(NOT BUILD_SHARED_LIBS)
     set(export_file_name "export_static.h")
 endif()
+include(CheckGit)
+CheckGitSetup()
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${PROJECT_BINARY_DIR}/include/pcog/config.h @ONLY)
+
 generate_export_header(libpcog EXPORT_FILE_NAME include/pcog/${export_file_name})
 
 set(sources
@@ -124,6 +132,7 @@ target_compile_definitions(libpcog PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>
 
 target_link_libraries(libpcog
         PUBLIC ${SOPLEX_LIBRARIES}
+        PRIVATE git_version
         )
 target_include_directories(libpcog
         PUBLIC

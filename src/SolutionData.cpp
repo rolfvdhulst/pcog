@@ -296,7 +296,7 @@ void SolutionData::doPresolve() {
    NodeColoring searchColoring = initialColoring;
    NodeColoring bestColoring = initialColoring;
    TabuColoring tabuAlgorithm(m_preprocessedGraph);
-   tabuAlgorithm.setMaxIterations(100'000); //TODO: make parameter
+   tabuAlgorithm.setMaxIterations(settings().numInitialTabuIterations());
    while( lb <= numSearchColors) {
       std::size_t removeColor = numSearchColors; //We remove the 'highest' color, but different strategies are possible
       searchColoring.setNumColors(numSearchColors);

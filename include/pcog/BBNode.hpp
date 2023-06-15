@@ -127,7 +127,6 @@ class BBNode {
    RbTreeLinks<int64_t> m_lowerLinks;
 };
 
-enum class NodeSelectionStrategy { DFS, BFS, BEST_BOUND };
 class BBTree {
  public:
    class LowerRbTree;
@@ -169,8 +168,6 @@ class BBTree {
    std::vector<BBNode> m_nodes;
    std::priority_queue<node_id, std::vector<node_id>, std::greater<>>
        m_freeSlots;
-
-   NodeSelectionStrategy m_selection_strategy;
 
    int64_t lowerRoot = RbTreeLinks<int64_t>::noLink();
    int64_t lowerMin = RbTreeLinks<int64_t>::noLink();

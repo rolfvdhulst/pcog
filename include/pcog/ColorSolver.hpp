@@ -29,7 +29,7 @@ enum class SolverStatus{
 /// a solution pool, the search tree and it provides a simple user interface
 class ColorSolver {
  public:
-   ColorSolver() : m_solData{m_settings}{};
+   ColorSolver(const Settings& settings) : m_settings{settings}, m_solData{m_settings}{};
 
    void setProblem(std::string t_name, DenseGraph t_graph);
 

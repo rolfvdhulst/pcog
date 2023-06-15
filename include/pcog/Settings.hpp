@@ -28,7 +28,7 @@ enum class BranchingStrategy : int {
    SMALL_DIFFERENCE = 13
 };
 
-enum class CandidateSelectionStrategy {
+enum class CandidateSelectionStrategy : int {
    VIOLATED_IN_BOTH = 0,
    VIOLATED_IN_SAME = 1,
    VIOLATED_IN_DIFFER = 2,
@@ -36,22 +36,22 @@ enum class CandidateSelectionStrategy {
    FIRST = 4
 };
 
-enum class NodeSelectionStrategy {
-   BOUND,     /// Choose the b&b node with smallest lower bound.
-   DFS_BOUND, /// Pick child nodes of the current node until a child node has a
+enum class NodeSelectionStrategy : int{
+   BOUND = 0,     /// Choose the b&b node with smallest lower bound.
+   DFS_BOUND = 1, /// Pick child nodes of the current node until a child node has a
               /// lower bound greater than the current global lower bound.
               /// In this case, it backtracks to the node with smallest lower bound.
               /// This method is useful for hard instances to quickly improve the lower bound
-   DFS_RESTART /// Pick a child node of the current node if possible.
+   DFS_RESTART = 2 /// Pick a child node of the current node if possible.
                /// Restart every x nodes where x is equal to restartDFSFrequency,
                /// choosing the node with smallest bound.
 };
 
 ///When picking a child node
-enum class NodeChildSelectionStrategy{
-   PREFER_SAME,
-   PREFER_DIFFER,
-   RANDOMLY
+enum class NodeChildSelectionStrategy : int{
+   PREFER_SAME = 0,
+   PREFER_DIFFER = 1,
+   RANDOMLY = 2
 };
 class Settings {
  public:
@@ -63,14 +63,8 @@ class Settings {
    ///Settings e.g. methods that will typically not affect performance (except for determining the starting/ending point)
    void setNodeLimit(std::size_t t_node_limit) { m_node_limit = t_node_limit; }
    void setTimeLimit(double t_time_limit) { m_time_limit = t_time_limit; }
-   void setAbsGapLimit(std::size_t t_gap_limit) {
-      m_absgap_limit = t_gap_limit;
-   }
-   void setRelGapLimit(double t_gap_limit) { m_relgap_limit = t_gap_limit; }
    [[nodiscard]] std::size_t nodeLimit() const { return m_node_limit; }
    [[nodiscard]] double timeLimit() const { return m_time_limit; }
-   [[nodiscard]] std::size_t absGapLimit() const { return m_absgap_limit; }
-   [[nodiscard]] double relGapLimit() const { return m_relgap_limit; }
 
    void setBranchingStrategy(BranchingStrategy t_strategy) {
       m_branchingStrategy = t_strategy;
@@ -100,6 +94,7 @@ class Settings {
 
    void setDivingFrequency(int t_frequency) { m_diving_frequency = t_frequency; }
    [[nodiscard]] int divingFrequency() const { return m_diving_frequency; }
+
    void setDivingPricingFrequency(int t_frequency) {
       m_diving_pricing_frequency = t_frequency;
    }
@@ -124,6 +119,9 @@ class Settings {
       m_numMaxThreads = t_numThreads;
    }
    [[nodiscard]] std::size_t numThreads() const { return m_numMaxThreads;}
+
+   void setNumInitialTabuIterations(std::size_t numIters) { m_numInitialTabuIterations = numIters;}
+   [[nodiscard]] std::size_t numInitialTabuIterations() const {return m_numInitialTabuIterations;}
  private:
    std::size_t m_node_limit; /// maximal number of nodes to process
    double m_time_limit; /// maximal time in seconds to run
@@ -149,6 +147,8 @@ class Settings {
 
    std::size_t m_numMaxThreads; /// Maximum # of threads to run the program on.
                                 /// We use less if the system that we are running has less threads
+
+   std::size_t m_numInitialTabuIterations;
 };
 
 #endif // PCOG_INCLUDE_PCOG_SETTINGS_HPP

@@ -1,0 +1,6 @@
+//
+// Created by rolf on 15-6-23.
+//
+#include "git_version.h"
+
+const char *kGitHash = "@GIT_HASH@";
