@@ -9,15 +9,15 @@
 
 using namespace pcog;
 
+void printPcogVersion(){
+   std::cout<<"PCOG version "<<PCOG_VERSION_MAJOR<<"."<<PCOG_VERSION_MINOR<<"."<<PCOG_VERSION_PATCH<<" [mode: "<<CMAKE_BUILD_TYPE <<"] [git hash: "<<kGitHash<<"]\n";
+}
 
 void printVersion(){
-   std::cout<<"PCOG version "<<PCOG_VERSION_MAJOR<<"."<<PCOG_VERSION_MINOR<<"."<<PCOG_VERSION_PATCH<<" [mode: "<<CMAKE_BUILD_TYPE <<"] [git hash: "<<kGitHash<<"]\n";
+   printPcogVersion();
    std::cout<<"Compiled using: "<<__VERSION__<<"\n";
    std::cout<<"External libraries\n";
    std::cout<<"\t SoPlex version: "<<SOPLEX_VERSION_MAJOR<<"."<<SOPLEX_VERSION_MINOR<<"."<<SOPLEX_VERSION_PATCH<<"\n";
-   //  BOOST_VERSION % 100 is the patch level
-   //  BOOST_VERSION / 100 % 1000 is the minor version
-   //  BOOST_VERSION / 100000 is the major version
    std::cout<<"\t Boost version: "<<BOOST_VERSION / 100000 <<"." << BOOST_VERSION /100 %1000 <<"." << BOOST_VERSION % 100<<"\n";
 }
 void printUsage(){
@@ -45,6 +45,7 @@ void printUsage(){
 int main(int argc, char ** argv) {
    std::vector<std::string> arguments(argv, argv + argc);
    if (arguments.size() < 2) {
+      printPcogVersion();
       printUsage();
       return EXIT_FAILURE;
    }
@@ -52,9 +53,11 @@ int main(int argc, char ** argv) {
       printVersion();
       return EXIT_SUCCESS;
    } else if (arguments[1] == "-h" || arguments[1] == "--help") {
+      printPcogVersion();
       printUsage();
       return EXIT_SUCCESS;
    }
+   printPcogVersion();
    std::ifstream ifstream(arguments[1]);
    std::optional<DimacsFileHeader> header = readDimacsHeader(ifstream);
    if (!header.has_value()) {
