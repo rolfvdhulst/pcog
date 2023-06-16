@@ -61,8 +61,6 @@ BBNode&& BBTree::popNodeWithID(node_id id){
    return std::move(m_nodes[id]);
 }
 void BBTree::pruneUpperBound(std::size_t numColors) {
-   //TODO: pruned nodes are counted as 'processed' nodes in b&b loop visualization. Fix
-
    //Iterate from largest to smallest lowerBound, pruning the nodes with too high lowerBounds away
    LowerRbTree rbTree(this);
    int64_t node = rbTree.upper_bound();
@@ -71,6 +69,7 @@ void BBTree::pruneUpperBound(std::size_t numColors) {
       if(m_nodes[node].lowerBound() < numColors) break;
       int64_t next = rbTree.predecessor(node); //First get the predecessor, before invalidating the node
       removeFromTrees(node);
+      ++m_numPrunedNodes;
       node = next;
    }
 }
@@ -89,7 +88,7 @@ std::size_t BBTree::numTotalNodes() const {
    return m_totalNodes;
 }
 std::size_t BBTree::numProcessedNodes() const {
-   return numTotalNodes()-numOpenNodes();
+   return numTotalNodes()-numOpenNodes()-m_numPrunedNodes;
 }
 std::size_t BBTree::lowerBound() const {
    std::size_t lb = lowerMin == RbTreeLinks<int64_t>::noLink() ? std::numeric_limits<std::size_t>::max()
@@ -132,11 +131,7 @@ void BBTree::removeFromTrees(node_id t_nodeId) {
    rbTree.erase(static_cast<int64_t>(t_nodeId));
    m_freeSlots.push(t_nodeId);
 }
-const BBNode &BBTree::peekNode(node_id t_nodeId) const {
-   assert(t_nodeId < m_nodes.size());
-   //TODO: assert that node is not 'freed' up
-   return m_nodes[t_nodeId];
-}
+
 SmallBasis BBNode::basis() const { return m_initialBasis; }
 std::size_t BBNode::getNumAddedBranchingDecisions() const { return m_numAddedBranchingDecisions; }
 void BBNode::setBasis(SmallBasis basis) {

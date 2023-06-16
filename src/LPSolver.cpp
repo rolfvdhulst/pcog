@@ -75,7 +75,7 @@ bool LPSolver::solve() {
 RowVector LPSolver::getDualSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
    DVector spxVector(m_soplex.numRows());
-   bool result = m_soplex.getDual(spxVector); //TODO: error handling
+   bool result = m_soplex.getDual(spxVector);
    assert(result);
    RowVector rowVector(spxVector.dim());
    for (int i = 0; i < spxVector.dim(); ++i) {
@@ -86,7 +86,7 @@ RowVector LPSolver::getDualSolution() {
 }
 RowVector LPSolver::columnUpperBounds() {
    DVector spxVector(m_soplex.numCols());
-   m_soplex.getUpperReal(spxVector); //TODO: error handling
+   m_soplex.getUpperReal(spxVector);
    RowVector vector(spxVector.dim());
    for (int i = 0; i < spxVector.dim(); ++i) {
       vector[i].column = i;

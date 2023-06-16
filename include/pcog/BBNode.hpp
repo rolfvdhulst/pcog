@@ -136,7 +136,6 @@ class BBTree {
 
    [[nodiscard]] bool hasOpenNodes() const;
 
-   const BBNode& peekNode(node_id) const;
    BBNode &&popNextNode();
    BBNode &&popNodeWithID(node_id id);
 
@@ -173,6 +172,7 @@ class BBTree {
    int64_t lowerMin = RbTreeLinks<int64_t>::noLink();
 
    std::size_t m_totalNodes = 0;
+   std::size_t m_numPrunedNodes = 0;
 };
 
 } // namespace pcog
