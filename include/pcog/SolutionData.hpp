@@ -39,7 +39,7 @@ class SolutionData {
    std::size_t addStableSet(DenseSet t_set);
    std::size_t findOrAddStableSet(const DenseSet& t_set, std::size_t checkNewFromIndex = 0);
 
-   void addSolution(std::vector<std::size_t> t_stable_set_indices);
+   void addSolutionPresolve(std::vector<std::size_t> t_stable_set_indices);
 
    [[nodiscard]] std::size_t upperBoundUnscaled() ;
    [[nodiscard]] std::size_t lowerBoundUnscaled() ;
@@ -71,7 +71,7 @@ class SolutionData {
    void writeLocalVarsToGlobal(LocalSolutionData& t_localSolutionData,std::atomic_bool& stop);
    void writeLocalSolutionsToGlobal(LocalSolutionData& t_localSolutionData, std::atomic_bool& stop);
    void syncLocalVarsWithGlobal(LocalSolutionData& t_localSolutionData);
-   void syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id);
+   void syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id,  std::atomic_bool& stop);
 
    bool doRecomputeLowerBound(std::atomic_bool& stop);
  private:

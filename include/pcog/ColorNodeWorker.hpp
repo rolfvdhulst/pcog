@@ -55,6 +55,7 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
    NodeMap focusToPreprocessed() const;
 
  private:
+   void cleanUpOnCancel(BBNode& node, SolutionData &t_solData,std::atomic_bool& stop);
    void processNode(BBNode &node, SolutionData &t_solver, std::atomic_bool& stop);
 
    /// Performs 'node preprocessing', diminishing the size of the graphs
@@ -77,7 +78,7 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
                     std::atomic_bool& stop);
 
    PricingResult priceColumn(BBNode &node, SolutionData &t_solver,
-                             bool duringDiving);
+                             bool duringDiving,std::atomic_bool& stop);
    void solutionCallback(const DenseSet &current_nodes, SafeWeight weight,
                          void *user_data, bool first_solution,
                          bool &stop_solving, bool &accepted_solution);
@@ -91,7 +92,8 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
    void addColumns(const std::vector<DenseSet> &sets);
    void addColumnsToLP(const std::vector<DenseSet> &sets);
    std::vector<std::size_t> repairColoring(const std::vector<DenseSet> &coloring);
-   std::atomic_bool m_cancelCurrentNode;
+
+   volatile bool m_cancelCurrentNode;
    std::size_t m_worker_id;
    LocalSolutionData m_localData;
    LPSolver m_lpSolver;
@@ -120,7 +122,7 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
 
    bool solveLP();
 
-   void synchronizeStastistics(BBNode &node, SolutionData &t_data);
+   void synchronizeStastistics(BBNode &node, SolutionData &t_data, std::atomic_bool& stop);
 };
 } // namespace pcog
 

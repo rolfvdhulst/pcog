@@ -83,7 +83,7 @@ class LPSolver {
 
    /// Solves the linear program
    /// \return true if solved successfully, false if some error occurred.
-   bool solve();
+   bool solve(volatile bool * interrupt);
 
    void changeBounds(ColIdx col, double lb, double ub);
    void setObjectiveUpperLimit(double limit);

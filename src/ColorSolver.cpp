@@ -42,6 +42,7 @@ SolverStatus ColorSolver::solve() {
       if (m_status == SolverStatus::ERROR ||
           m_status == SolverStatus::SOLVED_OPTIMALLY) {
          recordStatistics();
+         displayEndResult(std::cout);
          return m_status;
       }
    }
@@ -60,6 +61,9 @@ SolverStatus ColorSolver::presolve() {
    setStatus(SolverStatus::PRESOLVING);
    m_solData.doPresolve();
    setStatus(SolverStatus::PRESOLVED);
+   if(m_solData.lowerBound() == m_solData.upperBound()){
+      setStatus(SolverStatus::SOLVED_OPTIMALLY);
+   }
    auto time_end = std::chrono::high_resolution_clock::now();
    m_statistics.m_presolve_time = std::chrono::duration<double>(time_end - time_start);
    return m_status;
@@ -68,34 +72,6 @@ void ColorSolver::branchAndBound() {
    auto time_start = std::chrono::high_resolution_clock::now();
    setStatus(SolverStatus::SOLVING);
    m_solData.runBranchAndBound();
-//   m_workers = std::vector<ColorNodeWorker>(numHardWareThreads);
-//   // Branch-and-bound loop
-//   while (m_solData.hasOpenNodes()) {
-//      std::size_t numThreads = std::min(m_solData.numOpenNodes(),numHardWareThreads);
-//      // TODO: smartly pick so that workers are given child nodes as jobs
-//      if(numThreads == 0){ //TODO: change to 1
-//         m_workers[0].processNextNode(m_solData);
-//      }else{
-//         std::vector<std::thread> threads;
-//         for(std::size_t i = 0; i < numThreads; ++i){
-//            //TODO: prevent launching new thread every time.
-//         }
-//         for(auto& thread : threads){
-//            thread.join();
-//         }
-//      }
-//
-//
-//      if (m_solData.checkNodeLimitHit() ||
-//          m_solData.checkTimelimitHit()) {
-//         break;
-//      }
-//      //Display every n'th node and the root node
-//      if(m_solData.numProcessedNodes() == 1  ||
-//          m_solData.numProcessedNodes() % m_settings.nodeDisplayFrequency() == 0 ){
-//         m_solData.display(std::cout);
-//      }
-//   }
    auto time_end = std::chrono::high_resolution_clock::now();
    m_statistics.m_branch_and_bound_time = std::chrono::duration<double>(time_end - time_start);
    // TODO: be careful with termination from time limit in processNode before
@@ -115,14 +91,22 @@ void ColorSolver::displayEndResult(std::ostream &t_stream) {
    t_stream << "\nStatus                 : ";
    switch(m_status){
    case SolverStatus::NO_PROBLEM:
+      std::cout<<"No problem set";
+      break;
    case SolverStatus::PROBLEM_INITIALIZED:
+      std::cout<<"The problem has been initialized";
+      break;
    case SolverStatus::PRESOLVING:
+      std::cout<<"PCOG is still presolving the problem";
+      break;
    case SolverStatus::PRESOLVED:
+      std::cout<<"Problem has been presolved";
+      break;
    case SolverStatus::SOLVING:
-      std::cout<<"Unknown status"; //TODO: fix
+      std::cout<<"PCOG is still solving the problem"; //TODO: fix
       break;
    case SolverStatus::SOLVED_SUBOPTIMALLY:
-      t_stream <<"Solution found but proved to be optimal";
+      t_stream <<"Solution found but not proved to be optimal";
       break;
    case SolverStatus::SOLVED_OPTIMALLY:
       t_stream <<"Optimal solution found";

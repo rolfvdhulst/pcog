@@ -46,6 +46,7 @@ template <WeightFunction F> class MaxWeightStableSetCombinatorial {
    void setNodeLimit(std::size_t num_nodes);
    void setTimeLimit(std::chrono::nanoseconds nanoseconds);
    void setTimeLimitCheckInterval(std::size_t interval_nodes);
+   void setInterrupt(volatile bool * interrupt);
 
    [[nodiscard]] bool stoppedBeforeOptimality() const;
    [[nodiscard]] std::size_t numBranchAndBoundNodes() const;
@@ -89,6 +90,7 @@ template <WeightFunction F> class MaxWeightStableSetCombinatorial {
    // user settings
    void *user_data = nullptr;
    SolutionCallback *callback = nullptr;
+   volatile bool * interrupt = nullptr;
 
    std::chrono::nanoseconds time_limit =
        std::numeric_limits<std::chrono::nanoseconds>::max();
@@ -104,6 +106,11 @@ template <WeightFunction F> class MaxWeightStableSetCombinatorial {
    std::chrono::high_resolution_clock::duration time_taken =
        std::chrono::high_resolution_clock::duration(0);
 };
+template <WeightFunction F>
+void MaxWeightStableSetCombinatorial<F>::setInterrupt(
+    volatile bool *t_interrupt) {
+   interrupt = t_interrupt;
+}
 
 template <WeightFunction F>
 MaxWeightStableSetCombinatorial<F>::BranchData::BranchData(std::size_t capacity)
@@ -182,7 +189,7 @@ bool MaxWeightStableSetCombinatorial<F>::branch(std::size_t depth) {
    }
    if (num_branch_and_bound_nodes % time_limit_check_interval == 0) {
       auto end = std::chrono::high_resolution_clock::now();
-      if (std::chrono::duration_cast<std::chrono::nanoseconds>(end - start_time)
+      if ((interrupt != nullptr && *interrupt) || std::chrono::duration_cast<std::chrono::nanoseconds>(end - start_time)
               .count() > time_limit.count()) {
          stopped_before_optimality = true;
          return true;

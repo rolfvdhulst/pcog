@@ -107,7 +107,7 @@ std::string itsToString(std::size_t iterations) {
    return str;
 }
 
-void SolutionData::addSolution(std::vector<std::size_t> t_stable_set_indices) {
+void SolutionData::addSolutionPresolve(std::vector<std::size_t> t_stable_set_indices) {
 #ifndef NDEBUG
    {
       // assert that coloring is indeed a valid coloring
@@ -333,7 +333,7 @@ void SolutionData::doPresolve() {
       std::scoped_lock guard(m_lowerBound_mutex);
       assignLB(f_lb,lb);
    }
-   addSolution(indices);
+   addSolutionPresolve(indices);
 
 }
 bool SolutionData::checkNodeLimitHit() const {
@@ -343,6 +343,9 @@ void SolutionData::initializeBBTree() {
    m_tree.createRootNode(m_preprocessedGraph.numNodes());
 }
 
+//Nodes count as explored when branch-and-price loop for that node was terminated
+//Pruned nodes are nodes which are created but for which branch-and-price is never run
+//Open nodes are all nodes which are not yet explored or pruned
 std::size_t SolutionData::numOpenNodes() {
    std::scoped_lock guard(m_lowerBound_mutex);
    std::size_t numNodes = m_tree.numOpenNodes();
@@ -486,7 +489,7 @@ void SolutionData::writeLocalVarsToGlobal(
    writeLocalSolutionsToGlobal(t_localSolutionData,stop);
 }
 
-void SolutionData::syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id) {
+void SolutionData::syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id, std::atomic_bool& stop) {
    bool improved = false;
    {
       std::scoped_lock guard(m_lowerBound_mutex);
@@ -498,6 +501,13 @@ void SolutionData::syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker
          m_processing_node_lower_bounds[worker_id]->m_lb = lbInfo.m_lb;
       }
       improved = recomputeLowerBound();
+      std::scoped_lock ub_guard(m_upperBound_mutex);
+      if(m_lowerBound == m_upperBound) {
+         stop = true;
+         for(auto& worker : m_workers) {
+            worker.cancelNode(true);
+         }
+      }
    }
    if(improved) {
       display(std::cout);
@@ -628,6 +638,9 @@ bool SolutionData::doRecomputeLowerBound(std::atomic_bool& stop) {
       std::scoped_lock ub_guard(m_upperBound_mutex);
       if(improved && m_lowerBound == m_upperBound) {
          stop = true;
+         for(auto& worker : m_workers) {
+            worker.cancelNode(true);
+         }
       }
    }
    if (improved) {
@@ -680,6 +693,13 @@ void SolutionData::writeLocalSolutionsToGlobal(
          m_upperBound = minSize;
          m_incumbent_index = minColIndex;
          incumbentChanged = true;
+         std::scoped_lock lb_guard(m_lowerBound_mutex);
+         if(m_lowerBound == m_upperBound) {
+            stop = true;
+            for (auto &worker : m_workers) {
+               worker.cancelNode(true);
+            }
+         }
       }
       t_localSolutionData.m_solutions.clear();
    }

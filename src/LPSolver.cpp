@@ -66,9 +66,9 @@ void LPSolver::addColumn(const std::vector<ColElem>& t_colElements, double t_obj
    }
    m_soplex.addColReal(LPCol(t_objective,col,t_upperBound,t_lowerBound));
 }
-bool LPSolver::solve() {
+bool LPSolver::solve(volatile bool * interrupt) {
    m_soplex.setIntParam(soplex::SoPlexBase<double>::VERBOSITY,0);
-   auto status = m_soplex.optimize();
+   auto status = m_soplex.optimize(interrupt);
 
    return status == SPxSolver::Status::OPTIMAL;
 }

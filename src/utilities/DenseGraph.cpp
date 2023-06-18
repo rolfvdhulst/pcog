@@ -156,7 +156,7 @@ Node DenseGraph::addNodeWithNeighbourhood(DenseSet t_neighbourhood) {
    return node;
 }
 degree_type DenseGraph::nodeDegree(Node t_node) const {
-   return neighbourhood(t_node).size(); // TODO: cache size values?
+   return neighbourhood(t_node).size();
 }
 void DenseGraph::clear() {
    m_adjacencyMatrix.clear();
