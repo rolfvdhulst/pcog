@@ -250,13 +250,7 @@ void SolutionData::display(std::ostream& t_stream){
 std::chrono::duration<double> SolutionData::timeSinceStart() const {
    return std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start_solve_time);
 }
-bool SolutionData::checkTimelimitHit() const {
-   double timeLimit = m_settings.timeLimit();
-   if (timeLimit == NO_TIME_LIMIT) {
-      return false;
-   }
-   return timeSinceStart().count() >= timeLimit;
-}
+
 
 void SolutionData::startSolveTime() {
    m_start_solve_time = std::chrono::high_resolution_clock::now();
@@ -637,10 +631,7 @@ bool SolutionData::doRecomputeLowerBound(std::atomic_bool& stop) {
 
       std::scoped_lock ub_guard(m_upperBound_mutex);
       if(improved && m_lowerBound == m_upperBound) {
-         stop = true;
-         for(auto& worker : m_workers) {
-            worker.cancelNode(true);
-         }
+         stopComputation(stop);
       }
    }
    if (improved) {
@@ -695,10 +686,7 @@ void SolutionData::writeLocalSolutionsToGlobal(
          incumbentChanged = true;
          std::scoped_lock lb_guard(m_lowerBound_mutex);
          if(m_lowerBound == m_upperBound) {
-            stop = true;
-            for (auto &worker : m_workers) {
-               worker.cancelNode(true);
-            }
+            stopComputation(stop);
          }
       }
       t_localSolutionData.m_solutions.clear();
@@ -708,5 +696,29 @@ void SolutionData::writeLocalSolutionsToGlobal(
       display(std::cout);
    }
 
+}
+std::optional<std::chrono::duration<double>> SolutionData::timeLeft() const {
+   if(m_settings.timeLimit() == NO_TIME_LIMIT) {
+      return std::nullopt;
+   }
+   auto timeLimit = std::chrono::duration<double>(m_settings.timeLimit());
+   return timeLimit - std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start_solve_time);
+}
+
+bool SolutionData::checkTimeLimitHit(std::atomic_bool &stop) {
+   auto durationLeft = timeLeft();
+   bool timeLimitHit = durationLeft.has_value() && durationLeft.value().count() < TIMEOUT_SAFETY;
+   if(timeLimitHit) {
+      stopComputation(stop);
+   }
+   return timeLimitHit;
+}
+void SolutionData::stopComputation(std::atomic_bool &stop) {
+   if(!stop) {
+      stop = true;
+      for (auto &worker : m_workers) {
+         worker.cancelNode(true);
+      }
+   }
 }
 }// namespace pcog

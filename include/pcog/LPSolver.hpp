@@ -31,7 +31,7 @@ using ColVector = std::vector<ColElem>;
 
 enum class ObjectiveSense { MINIMIZE, MAXIMIZE };
 
-enum class LPSolverStatus {INFEASIBLE, OPTIMAL, ERROR};
+enum class LPSolverStatus {INFEASIBLE, OPTIMAL, ABORT_TIMEOUT, ABORT_VALUE, ERROR};
 struct LPBasis{
    LPBasis(std::size_t numRows, std::size_t numCols) : rowStatus(numRows,soplex::SPxSolver::VarStatus::ON_LOWER),
                                                        colStatus(numCols,soplex::SPxSolver::VarStatus::ON_LOWER){};
@@ -80,10 +80,11 @@ class LPSolver {
    void markAllColumnsIntegral();
    void setIntegralityPolishing(bool polishing);
 
+   void setTimeLimit(std::optional<std::chrono::duration<double>> seconds);
 
    /// Solves the linear program
    /// \return true if solved successfully, false if some error occurred.
-   bool solve(volatile bool * interrupt);
+   LPSolverStatus  solve(volatile bool * interrupt);
 
    void changeBounds(ColIdx col, double lb, double ub);
    void setObjectiveUpperLimit(double limit);

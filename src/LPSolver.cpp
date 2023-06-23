@@ -12,6 +12,10 @@ LPSolverStatus convertStatus(SPxSolver::Status status){
       return LPSolverStatus::OPTIMAL;
    case SPxSolverBase<double>::Status::INFEASIBLE:
       return LPSolverStatus::INFEASIBLE;
+   case SPxSolverBase<double>::Status::ABORT_TIME:
+      return LPSolverStatus::ABORT_TIMEOUT;
+   case SPxSolverBase<double>::Status::ABORT_VALUE:
+      return LPSolverStatus::ABORT_VALUE;
 //   case SPxSolverBase<double>::Status::UNBOUNDED:
 //   case SPxSolverBase<double>::Status::INForUNBD:
 //   case SPxSolverBase<double>::Status::OPTIMAL_UNSCALED_VIOLATIONS:
@@ -23,7 +27,6 @@ LPSolverStatus convertStatus(SPxSolver::Status status){
 //   case SPxSolverBase<double>::Status::ABORT_EXDECOMP:
 //   case SPxSolverBase<double>::Status::ABORT_DECOMP:
 //   case SPxSolverBase<double>::Status::ABORT_CYCLING:
-//   case SPxSolverBase<double>::Status::ABORT_TIME:
 //   case SPxSolverBase<double>::Status::ABORT_ITER:
 //   case SPxSolverBase<double>::Status::ABORT_VALUE:
 //   case SPxSolverBase<double>::Status::SINGULAR:
@@ -32,7 +35,11 @@ LPSolverStatus convertStatus(SPxSolver::Status status){
 //   case SPxSolverBase<double>::Status::RUNNING:
 //   case SPxSolverBase<double>::Status::UNKNOWN:
    default:
-      return LPSolverStatus::ERROR; //TODO: create more cases
+   {
+      std::cout<<"Soplex status: "<< status<<"\n";
+      return LPSolverStatus::ERROR;
+
+   }
    }
 }
 void LPSolver::setObjectiveSense(ObjectiveSense t_objective) {
@@ -66,11 +73,12 @@ void LPSolver::addColumn(const std::vector<ColElem>& t_colElements, double t_obj
    }
    m_soplex.addColReal(LPCol(t_objective,col,t_upperBound,t_lowerBound));
 }
-bool LPSolver::solve(volatile bool * interrupt) {
+LPSolverStatus LPSolver::solve(volatile bool * interrupt) {
    m_soplex.setIntParam(soplex::SoPlexBase<double>::VERBOSITY,0);
+   m_soplex.setIntParam(soplex::SoPlexBase<double>::TIMER,2);//Sets timer to wallclock timer rather than usertime
    auto status = m_soplex.optimize(interrupt);
 
-   return status == SPxSolver::Status::OPTIMAL;
+   return convertStatus(status);
 }
 RowVector LPSolver::getDualSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
@@ -188,6 +196,9 @@ void LPSolver::setIntegralityPolishing(bool polishing) {
 
 void LPSolver::removeRows(std::vector<int>& permutation){
    m_soplex.removeRowsReal(permutation.data());
+}
+void LPSolver::setTimeLimit(std::optional<std::chrono::duration<double>> seconds){
+   m_soplex.setRealParam(soplex::SoPlexBase<double>::TIMELIMIT,seconds.has_value() ? seconds->count() : soplex::infinity);
 }
 SmallBasis toSmallBasis(const LPBasis& basis){
    SmallBasis smallBasis;

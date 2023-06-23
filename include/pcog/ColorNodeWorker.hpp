@@ -14,6 +14,8 @@
 #include "LocalSolutionData.hpp"
 #include "Settings.hpp"
 
+
+
 namespace pcog {
 
 class SolutionData;
@@ -91,7 +93,8 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
    void maximizeStableSet(DenseSet &set, const DenseGraph &graph);
    void addColumns(const std::vector<DenseSet> &sets);
    void addColumnsToLP(const std::vector<DenseSet> &sets);
-   std::vector<std::size_t> repairColoring(const std::vector<DenseSet> &coloring);
+   std::vector<std::size_t> repairColoring(const std::vector<DenseSet> &coloring,
+                                           const SolutionData& t_solData);
 
    volatile bool m_cancelCurrentNode;
    std::size_t m_worker_id;
@@ -120,7 +123,7 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
    StableSetMaximizer m_maximizer;
 
 
-   bool solveLP();
+   LPSolverStatus solveLP(const SolutionData &t_data);
 
    void synchronizeStastistics(BBNode &node, SolutionData &t_data, std::atomic_bool& stop);
 };

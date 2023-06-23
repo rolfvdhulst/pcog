@@ -11,36 +11,47 @@
 #include "pcog/mwss/CombinatorialStableSet.hpp"
 #include "pcog/SolutionData.hpp"
 #include <thread>
-#include <soplex_interface.h>
+#include <soplex_interface.h> //TODO: removable?
 
 namespace pcog {
 void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData, std::atomic_bool& stop) {
    // Node preprocessing to compute focus graph and complete focus graph
    setupNode(t_node,t_solData,stop);
-   if(m_cancelCurrentNode){
+   if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){
       cleanUpOnCancel(t_node,t_solData,stop);
       return;
    }
    // Solve lp
-   solveLP();
-   if(m_cancelCurrentNode){
+   LPSolverStatus status = solveLP(t_solData);
+   if(!m_cancelCurrentNode && status == LPSolverStatus::ABORT_TIMEOUT){
+      t_solData.stopComputation(stop);
+   }else if(status == LPSolverStatus::ERROR){
+      std::cout<<"LP Error!\n";
+      t_solData.stopComputation(stop);
+   }
+   if(m_cancelCurrentNode ){
       cleanUpOnCancel(t_node,t_solData,stop);
       return;
    }
    // Farkas pricing: price in new columns until lp solution is feasible
-   while (m_lpSolver.status() == LPSolverStatus::INFEASIBLE) {
+   while (status == LPSolverStatus::INFEASIBLE) {
       farkasPricing(t_node);
+      status = solveLP(t_solData);
+      if(!m_cancelCurrentNode && status == LPSolverStatus::ABORT_TIMEOUT){
+         t_solData.stopComputation(stop);
+      }else if(status == LPSolverStatus::ERROR){
+         std::cout<<"LP Error!\n";
+         t_solData.stopComputation(stop);
+      }
       if(m_cancelCurrentNode){
          cleanUpOnCancel(t_node,t_solData,stop);
          return;
       }
    }
+
    // For graph coloring with ryan-foster branching the subproblem cannot be
    // infeasible, so we can ensure optimality of the lp here.
-   if (m_lpSolver.status() != LPSolverStatus::OPTIMAL) {
-      std::cout<<"Error, LP Solver returned: "<<static_cast<int>(m_lpSolver.status())<<"\n";
-      return;
-   }
+   assert(status != LPSolverStatus::INFEASIBLE);
 
    // Price-lp loop
    //TODO: pricing stores the basis, but ideally we only want to compute branching vertices after diving.
@@ -48,19 +59,20 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData, std::
    // 1. reset LP manually before computing branching solutions (downside = restoring basis might be expensive)
    // 2. perform diving in a separate LP solver object (downside = lots of copying)
    pricingLoop(t_node, t_solData,false,stop);
-   if(m_cancelCurrentNode){
+   if(m_cancelCurrentNode){ //time limit is checked in pricing loop, which would cancel this node if it was hit
       cleanUpOnCancel(t_node,t_solData,stop);
       return;
    }
    computeBranchingVertices(t_node, t_solData);
-   if(m_cancelCurrentNode){
+   if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){
       //If the node is cancelled after computing branching vertices, this is okay by us
       //In this case, we simply save them
       cleanUpOnCancel(t_node,t_solData,stop);
       return;
    }
    divingHeuristic(t_node,t_solData,stop);
-   if(m_cancelCurrentNode){
+
+   if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){
       cleanUpOnCancel(t_node,t_solData,stop);
       return;
    }
@@ -149,7 +161,6 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node) {
    }
    // Add new columns and resolve LP
    addColumns(pricedSets);
-   solveLP();
 }
 void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool duringDiving,
                                   std::atomic_bool& stop) {
@@ -159,27 +170,31 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
    while (numRounds < numPricingRoundsLimit && !m_cancelCurrentNode) {
       // Run rounding heuristics / integrality check on the current LP solution
       roundingHeuristic(node,t_solData,stop);
-      if(m_cancelCurrentNode){ //check if heuristics found an optimal solution
+      if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){ //check if heuristics found an optimal solution
          break;
       }
       // Solve pricing problem. If new columns can be found, add them and
       // resolve the LP. Otherwise, break away from loop as we have optimally
       // solved this node, and the lower bounds are updated.
       auto result = priceColumn(node, t_solData,duringDiving,stop);
-      if (m_cancelCurrentNode || result != PricingResult::FOUND_COLUMN) {
-         // TODO: also account for other sources of pricing stopping, such as
-         // time limits being hit.
+      if(result != PricingResult::FOUND_COLUMN){
          break;
+      }
+      if (m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)) {
+         return;
       }
       // Resolve lp with newly added columns
-      solveLP();
-      if(m_cancelCurrentNode){
+      LPSolverStatus status = solveLP(t_solData);
+      if(!m_cancelCurrentNode && status == LPSolverStatus::ABORT_TIMEOUT){
+         t_solData.stopComputation(stop);
+      }else if(status == LPSolverStatus::ERROR){
+         std::cout<<"LP Error!\n";
+         t_solData.stopComputation(stop);
+      }
+      if(m_cancelCurrentNode ){
          break;
       }
-      if (m_lpSolver.status() != LPSolverStatus::OPTIMAL) {
-         std::cout<<"Error, LP Solver returned: "<<static_cast<int>(m_lpSolver.status())<<"\n";
-         break;
-      }
+
       ++numRounds;
    }
    if(!duringDiving){
@@ -401,7 +416,10 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       m_mwssSolver->setLowerBound(dualWeights.getOne());
       m_mwssSolver->setInfiniteUpperBound();
       m_mwssSolver->setTimeLimitCheckInterval(10'000);
-      m_mwssSolver->setTimeLimit(std::chrono::seconds(3'600)); // TODO: fix
+      auto timeLeft = t_solData.timeLeft();
+      if(timeLeft.has_value()){
+         m_mwssSolver->setTimeLimit(timeLeft.value());
+      }
       m_mwssSolver->setInterrupt(&m_cancelCurrentNode);
       if(duringDiving){
          m_mwssSolver->setNodeLimit(10*m_focusGraph.numNodes()); //TODO: fix
@@ -599,7 +617,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,st
          for(auto& color : colors){
             maximizeStableSet(color,m_completeFocusGraph);
          }
-         auto indices = repairColoring(colors);
+         auto indices = repairColoring(colors,t_solData);
 
          addSolution(indices,node,t_solData,true,stop); //Currently we have already added the 'repaired' columns to the LP; we probably want to only do this if the solution is 'worth saving'
       };
@@ -641,7 +659,8 @@ LPBasis ColorNodeWorker::fixLPBasis(const SmallBasis &basis,
    return largeBasis;
 }
 std::vector<std::size_t>
-ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring) {
+ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring,
+                                const SolutionData& t_solData) {
    assert(m_localData.variables().size() == m_lpSolver.numCols());
 
    std::size_t oldIndex = m_localData.variables().size();
@@ -656,7 +675,9 @@ ColorNodeWorker::repairColoring(const std::vector<DenseSet> &coloring) {
       }
    }
    addColumnsToLP(toAddSets);
-   solveLP(); //TODO: why are we resolving LP here?
+   //Here we resolve the LP so that the new columns are also taken into account;
+   //otherwise, we lose consistency/ cannot query the LP status anymore
+   solveLP(t_solData); //TODO: fix resolving error handling etc. here
    return colorIndices;
 }
 void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets) {
@@ -742,14 +763,23 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData, s
       m_lpSolver.changeBounds(best_it->column,1.0,soplex::infinity); //TODO: test setting upper bounds?
       fixedUpperBoundVars.push_back(best_it->column);
       //resolve the LP
-      bool status = solveLP();
-      if(m_cancelCurrentNode || !status){ //exits when the LP solver has an error or the objective is cut off
+      LPSolverStatus status = solveLP(t_solData);
+      if(!m_cancelCurrentNode && status == LPSolverStatus::ABORT_TIMEOUT){
+         t_solData.stopComputation(stop);
+      }else if(status == LPSolverStatus::ERROR){
+         std::cout<<"LP Error!\n";
+         t_solData.stopComputation(stop);
+      }else if (status == LPSolverStatus::ABORT_VALUE){
+         break;
+      }
+
+      if(m_cancelCurrentNode ){ //exits when the LP solver has an error or the objective is cut off
          break;
       }
 
       if(doColumnGeneration){
          pricingLoop(t_node,t_solData,true,stop);
-         if(m_cancelCurrentNode){
+         if(m_cancelCurrentNode ){
             break;
          }
          if(m_lpSolver.objective() >= cutoffLimit){
@@ -803,11 +833,13 @@ void ColorNodeWorker::synchronizeStastistics(BBNode& t_node, SolutionData &t_dat
    }
 
 }
-bool ColorNodeWorker::solveLP() {
+LPSolverStatus ColorNodeWorker::solveLP(const SolutionData &t_data) {
    //Before every solve, we update the integrality information
    m_lpSolver.markAllColumnsIntegral();
+   auto timeLeft = t_data.timeLeft();
 
-   bool status = m_lpSolver.solve(&m_cancelCurrentNode);
+   m_lpSolver.setTimeLimit(timeLeft);
+   LPSolverStatus status = m_lpSolver.solve(&m_cancelCurrentNode);
    m_localData.addLPIterations(m_lpSolver.numIterations());
    return status;
 }
@@ -1037,7 +1069,7 @@ void ColorNodeWorker::improvementHeuristic(const std::vector<std::size_t>& solVa
          maximizeStableSet(color,preprocessedGraph);
       }
 
-      std::vector<std::size_t> indices = repairColoring(bestSetColoring.colors());
+      std::vector<std::size_t> indices = repairColoring(bestSetColoring.colors(),t_solData);
       addSolution(indices,t_node,t_solData,false,stop);
    }else{
       addSolution(solVarIndices,t_node,t_solData,false,stop); //add original solution otherwise

@@ -59,7 +59,9 @@ class SolutionData {
    void reset(DenseGraph t_graph);
 
    [[nodiscard]] std::chrono::duration<double> timeSinceStart() const;
-   [[nodiscard]] bool checkTimelimitHit() const;
+   [[nodiscard]] std::optional<std::chrono::duration<double>> timeLeft() const;
+   bool checkTimeLimitHit(std::atomic_bool& stop);
+   void stopComputation(std::atomic_bool& stop);
    [[nodiscard]] bool checkNodeLimitHit() const;
 
    [[nodiscard]] const Settings& settings() const;

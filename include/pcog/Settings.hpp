@@ -10,7 +10,7 @@
 #include <cmath>
 
 static constexpr double NO_TIME_LIMIT = 1e20;
-
+static constexpr double TIMEOUT_SAFETY = 1e-3;
 enum class BranchingStrategy : int {
    INTERSECTION_SIZE = 0,
    UNION_SIZE = 1,
