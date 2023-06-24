@@ -1108,6 +1108,10 @@ void ColorNodeWorker::runLoop(SolutionData &t_soldata, std::atomic_bool& stop) {
    while(!stop){
       //we pop the node with best bound when the thread has been idling.
       //This can only happen if the thread did no work or if the last node was cut off
+      if(t_soldata.settings().nodeLimit() != NO_NODE_LIMIT &&
+          t_soldata.numProcessedNodes() >= t_soldata.settings().nodeLimit()){
+         break;
+      }
       std::optional<BBNode> node = t_soldata.popNextNode(*this);
       bool processed = false;
       while(!m_cancelCurrentNode && !stop && node.has_value()){
@@ -1116,7 +1120,9 @@ void ColorNodeWorker::runLoop(SolutionData &t_soldata, std::atomic_bool& stop) {
          //Although we might have stopped here already, we want to save generated columns and statistics still!
          t_soldata.synchronizeLocalDataStatistics(m_localData);
          t_soldata.writeLocalVarsToGlobal(m_localData,stop); //Need to do this before branching, (otherwise, we have a race condition)
-         if(stop || m_cancelCurrentNode){
+         bool nodeLimitHit = t_soldata.settings().nodeLimit() != NO_NODE_LIMIT &&
+                             t_soldata.numProcessedNodes() >= t_soldata.settings().nodeLimit();
+         if(stop || m_cancelCurrentNode || nodeLimitHit){
             bool improved = t_soldata.doRecomputeLowerBound(stop);
             break;
          }

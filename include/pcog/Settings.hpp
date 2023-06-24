@@ -10,6 +10,7 @@
 #include <cmath>
 
 static constexpr double NO_TIME_LIMIT = 1e20;
+static constexpr std::size_t NO_NODE_LIMIT = std::numeric_limits<std::size_t>::max();
 static constexpr double TIMEOUT_SAFETY = 1e-3;
 enum class BranchingStrategy : int {
    INTERSECTION_SIZE = 0,
