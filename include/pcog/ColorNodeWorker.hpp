@@ -86,7 +86,9 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
                          bool &stop_solving, bool &accepted_solution);
    /// Checks if the node is cut off. If not, then decides the branching
    /// vertices u and v
-   void computeBranchingVertices(BBNode &node, SolutionData &t_solver);
+   void computeBranchingVertices(BBNode &node, SolutionData &t_solver,
+                                 const RowVector& t_primalSol,
+                                 const RowVector& t_dualSol);
 
    LPBasis fixLPBasis(const SmallBasis &basis, const NodeMap &previous_nodemap);
 

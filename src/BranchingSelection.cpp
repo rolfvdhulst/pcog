@@ -42,7 +42,8 @@ std::vector<ScoredEdge> getAllBranchingEdges(const DenseGraph &graph) {
 void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
                               BranchingStrategy strategy,
                               const DenseGraph &graph,
-                              LPSolver& t_lpSolver,
+                              const RowVector& t_primalSol,
+                              const RowVector& t_dualSol,
                               const NodeMap& t_nodeToLPRow,
                               const std::vector<StableSetVariable>& variables,
                               const NodeMap& mapToPreprocessed,
@@ -107,38 +108,32 @@ void scoreBranchingCandidates(std::vector<ScoredEdge> &candidates,
       return;
    case BranchingStrategy::HELDS_RULE:
    {
-      auto lpSol = t_lpSolver.getPrimalSolution();
-      scoreHeldsRule(candidates,lpSol,variables,mapToPreprocessed);
+      scoreHeldsRule(candidates,t_primalSol,variables,mapToPreprocessed);
       return;
    }
    case BranchingStrategy::RANDOMLY:
       return;
    case BranchingStrategy::DUAL_MAX:{
-      auto dualValues = t_lpSolver.getDualSolution();
-      scoreDualMaximization(candidates,dualValues,t_nodeToLPRow);
+      scoreDualMaximization(candidates,t_dualSol,t_nodeToLPRow);
       return;
    }
 
    case BranchingStrategy::DUAL_MIN:{
-      auto dualValues = t_lpSolver.getDualSolution();
-      scoreDualMinimization(candidates,dualValues,t_nodeToLPRow);
+      scoreDualMinimization(candidates,t_dualSol,t_nodeToLPRow);
       return;
    }
 
    case BranchingStrategy::FRACTIONAL:{
-      auto lpSol = t_lpSolver.getPrimalSolution();
-      scoreFractional(candidates,lpSol,variables,mapToPreprocessed,numPreprocessedNodes);
+      scoreFractional(candidates,t_primalSol,variables,mapToPreprocessed,numPreprocessedNodes);
       return;
    }
    case BranchingStrategy::REMOVAL_SIZE:{
-      auto lpSol = t_lpSolver.getPrimalSolution();
-      scoreRemovalSize(candidates,lpSol,variables,mapToPreprocessed);
+      scoreRemovalSize(candidates,t_primalSol,variables,mapToPreprocessed);
       return;
    }
 
    case BranchingStrategy::MIN_REMOVAL_SIZE:{
-      auto lpSol = t_lpSolver.getPrimalSolution();
-      scoreMinRemovalSize(candidates,lpSol,variables,mapToPreprocessed);
+      scoreMinRemovalSize(candidates,t_primalSol,variables,mapToPreprocessed);
       return;
    }
    case BranchingStrategy::SMALL_DIFFERENCE:{

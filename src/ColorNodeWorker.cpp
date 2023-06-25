@@ -63,19 +63,25 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData, std::
       cleanUpOnCancel(t_node,t_solData,stop);
       return;
    }
-   computeBranchingVertices(t_node, t_solData);
-   if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){
-      //If the node is cancelled after computing branching vertices, this is okay by us
-      //In this case, we simply save them
-      cleanUpOnCancel(t_node,t_solData,stop);
-      return;
-   }
+   assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
+   auto primalSol = m_lpSolver.getPrimalSolution();
+   auto dualSol = m_lpSolver.getDualSolution();
+
    divingHeuristic(t_node,t_solData,stop);
 
    if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){
       cleanUpOnCancel(t_node,t_solData,stop);
       return;
    }
+
+   computeBranchingVertices(t_node, t_solData,primalSol,dualSol);
+   if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){
+      //If the node is cancelled after computing branching vertices, this is okay by us
+      //In this case, we simply save them
+      cleanUpOnCancel(t_node,t_solData,stop);
+      return;
+   }
+
 
    synchronizeStastistics(t_node,t_solData,stop);
 }
@@ -198,22 +204,22 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
       ++numRounds;
    }
    if(!duringDiving){
-      node.setBasis(toSmallBasis(m_lpSolver.getLPBasis())); //TODO: which basis do we actually want to use?
+      node.setBasis(toSmallBasis(m_lpSolver.getLPBasis()));
    }
 }
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
-                                               SolutionData &t_solData) {
+                                               SolutionData &t_solData,
+                                               const RowVector& t_primalSol,
+                                               const RowVector& t_dualSol) {
    //TODO: divide function into smaller functions
-   assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    if(node.lowerBound() >= t_solData.upperBoundUnscaled()){
       node.setStatus(BBNodeStatus::CUT_OFF);
       return;
    }
 
-   auto primalSol = m_lpSolver.getPrimalSolution();
    //Get the candidate branching edges
    auto scoredEdges = getAllBranchingEdgesViolatedInBoth(
-       m_focusGraph, primalSol, m_localData.variables(),
+       m_focusGraph, t_primalSol, m_localData.variables(),
        m_mapToPreprocessed.oldToNewIDs);
 
    bool alwaysCheckSmallDifference = false;
@@ -221,14 +227,14 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
       //Score them according to some function
       scoreBranchingCandidates(
           scoredEdges, BranchingStrategy::SMALL_DIFFERENCE, m_focusGraph,
-          m_lpSolver, m_nodeToLPRow,
+          t_primalSol,t_dualSol, m_nodeToLPRow,
           m_localData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
       std::shuffle(scoredEdges.begin(),scoredEdges.end(),m_random_engine);
       std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
       const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
       auto best_it = selectBestPair(scoredEdges,t_solData.settings().candidateSelectionStrategy(),
-                                    primalSol,focusToPreprocessed,m_localData.variables());
+                                    t_primalSol,focusToPreprocessed,m_localData.variables());
       assert(best_it != scoredEdges.end());
       assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
       //TODO: how to sort/choose between node1 /node2?
@@ -275,14 +281,14 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
    std::shuffle(scoredEdges.begin(),scoredEdges.end(),m_random_engine);
    scoreBranchingCandidates(
        scoredEdges, t_solData.settings().branchingStrategy(), m_focusGraph,
-       m_lpSolver, m_nodeToLPRow,
+       t_primalSol,t_dualSol, m_nodeToLPRow,
        m_localData.variables(),m_mapToPreprocessed.newToOldIDs,m_completeFocusGraph.numNodes());
    std::stable_sort(scoredEdges.begin(),scoredEdges.end(),[](const ScoredEdge& a, const ScoredEdge& b){return a.score > b.score;});
 
    //Select pair, checking if they are violated in both branches
    const NodeMap& focusToPreprocessed = m_mapToPreprocessed.newToOldIDs;
    auto best_it = selectBestPair(scoredEdges,t_solData.settings().candidateSelectionStrategy(),
-                  primalSol,focusToPreprocessed,m_localData.variables());
+                  t_primalSol,focusToPreprocessed,m_localData.variables());
    assert(best_it != scoredEdges.end());
    assert(best_it->node1 != INVALID_NODE && best_it->node2 != INVALID_NODE);
    //TODO: how to sort/choose between node1 /node2?
