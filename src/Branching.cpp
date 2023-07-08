@@ -4,6 +4,8 @@
 
 #include "pcog/Branching.hpp"
 #include <numeric>
+
+#include <iostream> //TODO: remove again
 namespace pcog {
 
 std::pair<DenseGraph, PreprocessingResult>
@@ -250,6 +252,7 @@ preprocessBranchedGraph(const DenseGraph &t_graph,
                         const std::vector<BranchData> &t_branch_information,
                         std::size_t lower_bound) {
    std::vector<PreprocessedNode> removed_nodes;
+   std::vector<DenseSet> fixed_sets;
 
    DenseSet present_nodes(t_graph.numNodes(), true);
    assert(present_nodes.full());
@@ -266,42 +269,139 @@ preprocessBranchedGraph(const DenseGraph &t_graph,
    DenseSet checkForDominatedVertices = present_nodes;
    std::ptrdiff_t lastRoundRemovedNodesSize = 0;
 
-   bool firstRound = true;
+   std::size_t lastSuccessfulMethod = 0;
+   std::size_t round = 0;
+   //TODO: Fix; below loop does not preprocess everything.
    while (true) {
-      while (true) {
-         auto low_degree_removed = removeLowDegreeVertices(t_graph,present_nodes,lower_bound);
-         if (low_degree_removed.empty()) {
+      {
+         bool lowDegreeSuccesful = false;
+         while (true) {
+            auto low_degree_removed = removeLowDegreeVertices(t_graph,present_nodes,lower_bound);
+            if (low_degree_removed.empty()) {
+               break;
+            }
+            lowDegreeSuccesful = true;
+            removed_nodes.insert(removed_nodes.end(),
+                                 low_degree_removed.begin(),
+                                 low_degree_removed.end());
+         }
+         if (lowDegreeSuccesful) {
+            lastSuccessfulMethod = 0;
+         } else if (lastSuccessfulMethod == 1) {
             break;
          }
-         removed_nodes.insert(removed_nodes.end(), low_degree_removed.begin(),
-                              low_degree_removed.end());
       }
-      //We only check nodes whoms neighbourhood has changed for if they are dominated
-      //In the first iteration we check all present nodes
-      if(!firstRound){
-         checkForDominatedVertices.clear();
-         for(auto node_it = removed_nodes.begin() + lastRoundRemovedNodesSize; node_it != removed_nodes.end(); ++node_it){
-            checkForDominatedVertices.inplaceUnion(t_graph.neighbourhood(node_it->removedNode()));
+      {
+         auto roundFixedSets = fixStableNeighbourhoods(t_graph,present_nodes);
+         for(const auto& set : roundFixedSets){
+            for(Node node : set){
+               removed_nodes.emplace_back(node,PreprocessedReason::STABLE_NEIGHBOURHOOD,fixed_sets.size());
+            }
+            fixed_sets.push_back(set);
          }
-      }else{
-         firstRound = false;
+         assert(lower_bound >= roundFixedSets.size());
+         lower_bound -= roundFixedSets.size();
+         if(!roundFixedSets.empty()){
+            lastSuccessfulMethod = 1;
+         }else if(removed_nodes.size() == t_graph.numNodes() ||
+                    lastSuccessfulMethod == 2){
+            break;
+         }
       }
-      checkForDominatedVertices.inplaceIntersection(present_nodes);
-      lastRoundRemovedNodesSize = static_cast<ptrdiff_t>(removed_nodes.size());
 
-      auto dominated_removed =
-          removeDominatedVerticesClique(t_graph, present_nodes, checkForDominatedVertices);
-      if (dominated_removed.empty()) {
-         break;
+      //We only check nodes whoms neighbourhood has changed if they are removed or not.
+      //In the first iteration we check all present nodes
+      {
+         if (round != 0) {
+            checkForDominatedVertices.clear();
+            for (auto node_it =
+                     removed_nodes.begin() + lastRoundRemovedNodesSize;
+                 node_it != removed_nodes.end(); ++node_it) {
+               checkForDominatedVertices.inplaceUnion(
+                   t_graph.neighbourhood(node_it->removedNode()));
+            }
+         }
+         checkForDominatedVertices.inplaceIntersection(present_nodes);
+
+         lastRoundRemovedNodesSize =
+             static_cast<ptrdiff_t>(removed_nodes.size());
+
+         bool dominatedSuccesful = false;
+         std::size_t dominated_round = 0;
+         while(true){
+            auto dominated_removed = removeDominatedVerticesClique(
+                t_graph, present_nodes, checkForDominatedVertices);
+            if(dominated_removed.empty()){
+               break;
+            }
+            dominatedSuccesful = true;
+
+            removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
+                                 dominated_removed.end());
+            ++dominated_round;
+            checkForDominatedVertices.clear();
+            for(const auto& node : dominated_removed){
+               checkForDominatedVertices.inplaceUnion(t_graph.neighbourhood(node.removedNode()));
+            }
+            checkForDominatedVertices.inplaceIntersection(present_nodes);
+         }
+
+         if (dominatedSuccesful) {
+            lastSuccessfulMethod = 2;
+         } else if (lastSuccessfulMethod == 0) {
+            break;
+         }
       }
-      removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
-                           dominated_removed.end());
+      ++round;
    }
-
+//   bool firstRound = true;
+//   while (true) {
+//      while (true) {
+//         auto low_degree_removed = removeLowDegreeVertices(t_graph,present_nodes,lower_bound);
+//         if (low_degree_removed.empty()) {
+//            break;
+//         }
+//         removed_nodes.insert(removed_nodes.end(), low_degree_removed.begin(),
+//                              low_degree_removed.end());
+//      }
+//      //We only check nodes whoms neighbourhood has changed for if they are dominated
+//      //In the first iteration we check all present nodes
+//      if(!firstRound){
+//         checkForDominatedVertices.clear();
+//         for(auto node_it = removed_nodes.begin() + lastRoundRemovedNodesSize; node_it != removed_nodes.end(); ++node_it){
+//            checkForDominatedVertices.inplaceUnion(t_graph.neighbourhood(node_it->removedNode()));
+//         }
+//      }else{
+//         firstRound = false;
+//      }
+//      checkForDominatedVertices.inplaceIntersection(present_nodes);
+//      lastRoundRemovedNodesSize = static_cast<ptrdiff_t>(removed_nodes.size());
+//
+//      auto dominated_removed =
+//          removeDominatedVerticesClique(t_graph, present_nodes, checkForDominatedVertices);
+//      if (dominated_removed.empty()) {
+//         break;
+//      }
+//      removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
+//                           dominated_removed.end());
+//   }
+#ifndef NDEBUG
+   //ensure that there are no more dominated nodes in the graph
+   for(Node node : present_nodes){
+      for(Node otherNode : present_nodes){
+         if(otherNode == node){
+            continue;
+         }
+         DenseSet nb1 = t_graph.neighbourhood(node).intersection(present_nodes);
+         DenseSet nb2 = t_graph.neighbourhood(otherNode).intersection(present_nodes);
+         assert(!nb1.isProperSubsetOf(nb2));
+      }
+   }
+#endif
    auto [newGraph, newToOld] = t_graph.nodeInducedSubgraph(present_nodes);
    NodeMap oldToNew = NodeMap::inverse(newToOld, t_graph.numNodes());
 
-   return {newGraph, PreprocessedMap(removed_nodes,{}, newToOld, oldToNew)};
+   return {newGraph, PreprocessedMap(removed_nodes,fixed_sets, newToOld, oldToNew)};
 }
 
 
@@ -344,42 +444,143 @@ PreprocessingResult preprocessedGraphFromChild(const DenseGraph& t_preprocessedC
    DenseSet checkForDominatedVertices = present_nodes;
    std::ptrdiff_t lastRoundRemovedNodesSize = 0;
 
-   bool firstRound = true;
+   std::vector<DenseSet> fixed_sets;
+
+   std::size_t lastSuccessfulMethod = 0;
+   std::size_t round = 0;
+   //TODO: Fix; below loop does not preprocess everything.
    while (true) {
-      while (true) {
-         auto low_degree_removed = removeLowDegreeVertices(updatedGraph,present_nodes,lower_bound);
-         if (low_degree_removed.empty()) {
+      {
+         bool lowDegreeSuccesful = false;
+         while (true) {
+            auto low_degree_removed = removeLowDegreeVertices(updatedGraph,present_nodes,lower_bound);
+            if (low_degree_removed.empty()) {
+               break;
+            }
+            lowDegreeSuccesful = true;
+            removed_nodes.insert(removed_nodes.end(),
+                                 low_degree_removed.begin(),
+                                 low_degree_removed.end());
+         }
+         if (lowDegreeSuccesful) {
+            lastSuccessfulMethod = 0;
+         } else if (lastSuccessfulMethod == 1) {
             break;
          }
-         removed_nodes.insert(removed_nodes.end(), low_degree_removed.begin(),
-                              low_degree_removed.end());
       }
-      //We only check nodes whoms neighbourhood has changed for if they are dominated
-      //In the first iteration we check all present nodes
-      if(!firstRound){
-         checkForDominatedVertices.clear();
-         for(auto node_it = removed_nodes.begin() + lastRoundRemovedNodesSize; node_it != removed_nodes.end(); ++node_it){
-            checkForDominatedVertices.inplaceUnion(updatedGraph.neighbourhood(node_it->removedNode()));
+      {
+         auto roundFixedSets = fixStableNeighbourhoods(updatedGraph,present_nodes);
+         for(const auto& set : roundFixedSets){
+            for(Node node : set){
+               removed_nodes.emplace_back(node,PreprocessedReason::STABLE_NEIGHBOURHOOD,fixed_sets.size());
+            }
+            fixed_sets.push_back(set);
          }
-      }else{
-         firstRound = false;
+         assert(lower_bound >= roundFixedSets.size());
+         lower_bound -= roundFixedSets.size();
+         if(!roundFixedSets.empty()){
+            lastSuccessfulMethod = 1;
+         }else if(removed_nodes.size() == updatedGraph.numNodes() ||
+                    lastSuccessfulMethod == 2){
+            break;
+         }
       }
-      checkForDominatedVertices.inplaceIntersection(present_nodes);
-      lastRoundRemovedNodesSize = static_cast<ptrdiff_t>(removed_nodes.size());
 
-      auto dominated_removed =
-          removeDominatedVerticesClique(updatedGraph, present_nodes, checkForDominatedVertices);
-      if (dominated_removed.empty()) {
-         break;
+      //We only check nodes whoms neighbourhood has changed if they are removed or not.
+      //In the first iteration we check all present nodes
+      {
+         if (round != 0) {
+            checkForDominatedVertices.clear();
+            for (auto node_it =
+                     removed_nodes.begin() + lastRoundRemovedNodesSize;
+                 node_it != removed_nodes.end(); ++node_it) {
+               checkForDominatedVertices.inplaceUnion(
+                   updatedGraph.neighbourhood(node_it->removedNode()));
+            }
+         }
+         checkForDominatedVertices.inplaceIntersection(present_nodes);
+
+         lastRoundRemovedNodesSize =
+             static_cast<ptrdiff_t>(removed_nodes.size());
+
+         bool dominatedSuccesful = false;
+         std::size_t dominated_round = 0;
+         while(true){
+            auto dominated_removed = removeDominatedVerticesClique(
+                updatedGraph, present_nodes, checkForDominatedVertices);
+            if(dominated_removed.empty()){
+               break;
+            }
+            dominatedSuccesful = true;
+
+            removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
+                                 dominated_removed.end());
+            ++dominated_round;
+            checkForDominatedVertices.clear();
+            for(const auto& node : dominated_removed){
+               checkForDominatedVertices.inplaceUnion(updatedGraph.neighbourhood(node.removedNode()));
+            }
+            checkForDominatedVertices.inplaceIntersection(present_nodes);
+         }
+
+         if (dominatedSuccesful) {
+            lastSuccessfulMethod = 2;
+         } else if (lastSuccessfulMethod == 0) {
+            break;
+         }
       }
-      removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
-                           dominated_removed.end());
+      ++round;
    }
 
+//   bool firstRound = true;
+//   while (true) {
+//      while (true) {
+//         auto low_degree_removed = removeLowDegreeVertices(updatedGraph,present_nodes,lower_bound);
+//         if (low_degree_removed.empty()) {
+//            break;
+//         }
+//         removed_nodes.insert(removed_nodes.end(), low_degree_removed.begin(),
+//                              low_degree_removed.end());
+//      }
+//      //We only check nodes whoms neighbourhood has changed for if they are dominated
+//      //In the first iteration we check all present nodes
+//      if(!firstRound){
+//         checkForDominatedVertices.clear();
+//         for(auto node_it = removed_nodes.begin() + lastRoundRemovedNodesSize; node_it != removed_nodes.end(); ++node_it){
+//            checkForDominatedVertices.inplaceUnion(updatedGraph.neighbourhood(node_it->removedNode()));
+//         }
+//      }else{
+//         firstRound = false;
+//      }
+//      checkForDominatedVertices.inplaceIntersection(present_nodes);
+//      lastRoundRemovedNodesSize = static_cast<ptrdiff_t>(removed_nodes.size());
+//
+//      auto dominated_removed =
+//          removeDominatedVerticesClique(updatedGraph, present_nodes, checkForDominatedVertices);
+//      if (dominated_removed.empty()) {
+//         break;
+//      }
+//      removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
+//                           dominated_removed.end());
+//   }
+
+#ifndef NDEBUG
+   //ensure that there are no more dominated nodes in the graph
+   for(Node node : present_nodes){
+      for(Node otherNode : present_nodes){
+         if(otherNode == node){
+            continue;
+         }
+         DenseSet nb1 = updatedGraph.neighbourhood(node).intersection(present_nodes);
+         DenseSet nb2 = updatedGraph.neighbourhood(otherNode).intersection(present_nodes);
+         assert(!nb1.isProperSubsetOf(nb2));
+      }
+   }
+#endif
    auto [newGraph, newToOld] = updatedGraph.nodeInducedSubgraph(present_nodes);
    NodeMap oldToNew = NodeMap::inverse(newToOld, updatedGraph.numNodes());
 
-   return {newGraph, PreprocessedMap(removed_nodes,{}, newToOld, oldToNew)};
+   return {newGraph, PreprocessedMap(removed_nodes,fixed_sets, newToOld, oldToNew)};
 }
 
 }

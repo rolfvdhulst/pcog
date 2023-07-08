@@ -11,7 +11,6 @@
 #include "pcog/mwss/CombinatorialStableSet.hpp"
 #include "pcog/SolutionData.hpp"
 #include <thread>
-#include <soplex_interface.h> //TODO: removable?
 
 namespace pcog {
 void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData, std::atomic_bool& stop) {
@@ -54,10 +53,7 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData, std::
    assert(status != LPSolverStatus::INFEASIBLE);
 
    // Price-lp loop
-   //TODO: pricing stores the basis, but ideally we only want to compute branching vertices after diving.
-   //TODO: however, diving destroys LP information. Two options:
-   // 1. reset LP manually before computing branching solutions (downside = restoring basis might be expensive)
-   // 2. perform diving in a separate LP solver object (downside = lots of copying)
+   //TODO: test diving in a separate LP solver
    pricingLoop(t_node, t_solData,false,stop);
    if(m_cancelCurrentNode){ //time limit is checked in pricing loop, which would cancel this node if it was hit
       cleanUpOnCancel(t_node,t_solData,stop);
@@ -269,7 +265,6 @@ void ColorNodeWorker::computeBranchingVertices(BBNode &node,
             data.emplace_back(branching);
          }
 
-         std::cout << "Doing small-difference branching!\n";
          node.setBranchingNodes(firstNode,secondNode);
          node.setBranchingData(data);
          node.setStatus(BBNodeStatus::BRANCHED);
@@ -374,7 +369,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    assert(m_pricedVariables.empty());
 
    //First attempt to do so heuristically
-   bool doHeuristics = false;
+   bool doHeuristics = true;
    if(doHeuristics){
       AugmentingSearch search(dualWeights.weights(),m_focusGraph);
       std::vector<DenseSet> solutions =
@@ -472,8 +467,12 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
          fesetround(FE_DOWNWARD);
          double safeLowerBound = weightSum;
          safeLowerBound /= dualWeights.scale();
+         if(!m_mapToPreprocessed.fixed_sets.empty()){
+            double fixedSetsValue = m_mapToPreprocessed.fixed_sets.size(); //TODO: does downward rounding apply here?
+            safeLowerBound += fixedSetsValue;
+         }
          fesetround(mode);
-         assert(m_lpSolver.objective() >= safeLowerBound);
+         assert(m_lpSolver.objective() >= safeLowerBound - m_mapToPreprocessed.fixed_sets.size());
          improvedLB = node.updateLowerBound(safeLowerBound);
       }
 
@@ -491,8 +490,12 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       assert(pricingProblemUB >= 1.0 - t_solData.settings().roundingTolerance());
       fesetround(FE_DOWNWARD);
       double derivedLowerBound = m_lpSolver.objective() / pricingProblemUB;
+      if(!m_mapToPreprocessed.fixed_sets.empty()){
+         double fixedSetsValue = m_mapToPreprocessed.fixed_sets.size(); //TODO: does downward rounding apply here?
+         derivedLowerBound += fixedSetsValue;
+      }
       fesetround(mode);
-      assert(m_lpSolver.objective() >= derivedLowerBound);
+      assert(m_lpSolver.objective() >= derivedLowerBound-m_mapToPreprocessed.fixed_sets.size());
 
       improvedLB = node.updateLowerBound(derivedLowerBound);
    }
@@ -538,7 +541,7 @@ void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
 void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,std::atomic_bool& stop) {
 
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
-   double cutOffBound = static_cast<double>(t_solData.upperBoundUnscaled())-1.0; //TODO: fix global access
+   double cutOffBound = static_cast<double>(t_solData.upperBoundUnscaled())-1.0 - m_mapToPreprocessed.fixed_sets.size();
    if(m_lpSolver.objective() >= cutOffBound + t_solData.settings().roundingTolerance()){
       return;
    }
@@ -590,7 +593,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,st
    }
    bool addSuboptimalSolutions = false;
    if(uncoloredNodes.empty() &&
-       (color_indices.size() < t_solData.upperBoundUnscaled() || addSuboptimalSolutions)){
+       (color_indices.size() + m_mapToPreprocessed.fixed_sets.size() < t_solData.upperBoundUnscaled() || addSuboptimalSolutions)){
       //project solution back to original graph; although the sets form a coloring for this graph after branching, we also want to solution
       //to be valid in the root node.
       DenseSet originalUncolored(m_completeFocusGraph.numNodes(),true);
@@ -713,7 +716,8 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData, s
       return;
    }
    //do not dive if we cannot find an incumbent anyways (TODO make setting for finding equivalent solutions for crossover)
-   double cutoffLimit = t_solData.upperBoundUnscaled()-1.0 + t_solData.settings().roundingTolerance();
+   double cutoffLimit = t_solData.upperBoundUnscaled()-1.0 + t_solData.settings().roundingTolerance()
+       - m_mapToPreprocessed.fixed_sets.size();
    if(m_lpSolver.objective() > cutoffLimit){
       return;
    }
@@ -924,11 +928,15 @@ void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_
                                                node.branchDecisions(),
                                                node.getNumAddedBranchingDecisions(),
                                                m_mapToPreprocessed.oldToNewIDs,
-                                               node.lowerBound());
+                                               node.lowerBound()-m_mapToPreprocessed.fixed_sets.size());
 
       m_focusGraph = result.graph;
       m_mapToPreprocessed.extend(result.map);
 
+      if(m_mapToPreprocessed.newToOldIDs.size() == 0){
+         std::cout<<"Empty after preprocessing!\n";
+      }
+      //TODO: check if preprocessing found new optimal solution, and terminate if preprocessing removed the graph
       solver.writeLocalVarsToGlobal(m_localData,stop);
       setupChildLP(node,solver,result.map);
    }
@@ -943,7 +951,10 @@ void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_
       m_completeFocusGraph = completeGraph;
       m_focusGraph = result.graph;
       m_mapToPreprocessed = result.map;
-
+      if(m_mapToPreprocessed.newToOldIDs.size() == 0){
+         std::cout<<"Empty after preprocessing!\n";
+      }
+      //TODO: check if preprocessing found new optimal solution, and terminate if preprocessing removed the graph
       solver.syncLocalVarsWithGlobal(m_localData);
       setupLPFromScratch(node);
    }
@@ -1046,7 +1057,7 @@ void ColorNodeWorker::improvementHeuristic(const std::vector<std::size_t>& solVa
    TabuColoring tabuAlgorithm(preprocessedGraph);
    while( lb <= numSearchColors) {
       if(bestColoring.numColors() <= ub){
-         tabuAlgorithm.setMaxIterations(20'000);
+         tabuAlgorithm.setMaxIterations(100'000);
       }else{
          tabuAlgorithm.setMaxIterations(5'000);
       }
@@ -1167,6 +1178,7 @@ void ColorNodeWorker::cleanUpOnCancel(BBNode &t_node, SolutionData& t_solData,st
       }
    }
    synchronizeStastistics(t_node,t_solData,stop);
+   //TODO: check if we also need to write back variables or if this is done everywhere already
 }
 
 } // namespace pcog

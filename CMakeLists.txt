@@ -121,6 +121,19 @@ set(sources
         include/pcog/TabuColoring.hpp
         src/LocalSolutionData.cpp
         include/pcog/LocalSolutionData.hpp
+        src/reduction/DenseReductionGraph.cpp
+        include/pcog/reduction/DenseReductionGraph.hpp
+        src/reduction/LowDegreeReduction.cpp
+        src/reduction/DominatedReduction.cpp
+        src/reduction/ReductionStack.cpp
+        include/pcog/reduction/LowDegreeReduction.hpp
+        include/pcog/reduction/DominatedReduction.hpp
+        include/pcog/reduction/ReductionStack.hpp
+        src/reduction/ReductionVertexQueue.cpp
+        src/reduction/SimplicialReduction.cpp
+        include/pcog/reduction/SimplicialReduction.hpp
+        src/reduction/Reducer.cpp
+        include/pcog/reduction/Reducer.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

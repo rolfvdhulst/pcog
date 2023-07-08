@@ -7,6 +7,8 @@
 #include <ranges>
 #include <utility>
 
+#include "pcog/reduction/Reducer.hpp"
+
 namespace pcog {
 PreprocessingResult::PreprocessingResult(DenseGraph graph, PreprocessedMap map)
     : graph{std::move(graph)}, map{std::move(map)} {}
@@ -39,6 +41,10 @@ DenseSet findInitialClique(const DenseGraph& t_graph){
 }
 std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOriginalGraph(const DenseGraph &t_graph,
                                             std::size_t coloringUpperBound) {
+
+   reduceGraph(t_graph);
+   auto start = std::chrono::high_resolution_clock ::now();
+
    std::vector<PreprocessedNode> removed_nodes;
    std::vector<DenseSet> fixed_sets;
 
@@ -69,18 +75,28 @@ std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOr
 
    std::size_t lastSuccessfulMethod = 0;
    std::size_t round = 0;
+
+   std::size_t fixedSubgraphColors = 0;
+   //TODO: Fix; below loop does not preprocess everything.
+
    while (true) {
 
       {
          if(!subgraph.has_value() && minDegree < coloringUpperBound){
             subgraph = findInitialClique(t_graph);
             subgraphBound = subgraph->size();
+            for(const auto& set : fixed_sets){
+               if(set.intersection(subgraph.value()).any()){
+                  ++fixedSubgraphColors;
+               }
+            }
          }
          if(subgraph.has_value()){
             bool lowDegreeSuccesful = false;
             while (true) {
+               assert(fixedSubgraphColors <= subgraphBound.value());
                auto low_degree_removed =
-                   removeLowDegreeVerticesSubgraph(t_graph, present_nodes, subgraph.value(),subgraphBound.value());
+                   removeLowDegreeVerticesSubgraph(t_graph, present_nodes, subgraph.value(),subgraphBound.value()-fixedSubgraphColors);
                if (low_degree_removed.empty()) {
                   break;
                }
@@ -96,16 +112,19 @@ std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOr
             }else if(lastSuccessfulMethod == 1){
                break;
             }
+         }else if(lastSuccessfulMethod){
+            break;
          }
       }
       {
-         //TODO: think about whether this 'fixing' is enough to guarantee that we do not ruin preprocessing somehow...
-
          auto roundFixedSets = fixStableNeighbourhoods(t_graph,present_nodes);
          for(const auto& set : roundFixedSets){
             for(Node node : set){
                removed_nodes.emplace_back(node,PreprocessedReason::STABLE_NEIGHBOURHOOD,fixed_sets.size());
                removeNode(node);
+            }
+            if(subgraph.has_value() && set.intersection(subgraph.value()).any()){
+               ++fixedSubgraphColors;
             }
             fixed_sets.push_back(set);
          }
@@ -136,27 +155,62 @@ std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOr
          lastRoundRemovedNodesSize =
              static_cast<ptrdiff_t>(removed_nodes.size());
 
-         auto dominated_removed = removeDominatedVerticesClique(
-             t_graph, present_nodes, checkForDominatedVertices);
-         if (!dominated_removed.empty()) {
+         bool dominatedSuccesful = false;
+         std::size_t dominated_round = 0;
+         while(true){
+            auto dominated_removed = removeDominatedVerticesClique(
+                t_graph, present_nodes, checkForDominatedVertices);
+            if(dominated_removed.empty()){
+               break;
+            }
+            dominatedSuccesful = true;
+            for (const auto &node : dominated_removed) {
+               removeNode(node.removedNode());
+            }
+            removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
+                                 dominated_removed.end());
+            ++dominated_round;
+            checkForDominatedVertices.clear();
+            for(const auto& node : dominated_removed){
+               checkForDominatedVertices.inplaceUnion(t_graph.neighbourhood(node.removedNode()));
+            }
+            checkForDominatedVertices.inplaceIntersection(present_nodes);
+            if (subgraph.has_value()) {
+               checkForDominatedVertices.inplaceDifference(subgraph.value());
+            }
+            std::cout<<"Dominated round: "<<dominated_round<<" completed\n";
+         }
+
+         if (dominatedSuccesful) {
             lastSuccessfulMethod = 2;
          } else if (lastSuccessfulMethod == 0) {
             break;
          }
-         for (const auto &node : dominated_removed) {
-            removeNode(node.removedNode());
-         }
-         removed_nodes.insert(removed_nodes.end(), dominated_removed.begin(),
-                              dominated_removed.end());
       }
+      std::cout<<"Preprocessing round: "<<round<<" completed\n";
       ++round;
    }
+
+#ifndef NDEBUG
+   //ensure that there are no more dominated nodes in the graph
+   for(Node node : present_nodes){
+      for(Node otherNode : present_nodes){
+         if(otherNode == node){
+            continue;
+         }
+         DenseSet nb1 = t_graph.neighbourhood(node).intersection(present_nodes);
+         DenseSet nb2 = t_graph.neighbourhood(otherNode).intersection(present_nodes);
+         assert(!nb1.isProperSubsetOf(nb2));
+      }
+   }
+#endif
 
    auto [newGraph, newToOld] = t_graph.nodeInducedSubgraph(present_nodes);
    NodeMap oldToNew = NodeMap::inverse(newToOld, t_graph.numNodes());
 
    std::cout<<"Preprocessing removed "<< removed_nodes.size()<<" nodes, fixed "<<fixed_sets.size()<<" colors \n";
-
+   auto end = std::chrono::high_resolution_clock::now();
+   std::cout<<"Took: "<< std::chrono::duration_cast<std::chrono::milliseconds>(end-start)<<"\n";
    std::optional<LowerBoundCertificate> certificate = std::nullopt;
    if(subgraph.has_value()){
       certificate = LowerBoundCertificate{.set = subgraph.value(),.bound = subgraph->size(),
@@ -198,6 +252,10 @@ removeDominatedVerticesClique(const DenseGraph &graph, DenseSet &present_nodes,
    for(const auto& node_a : checkForDominatedVertices){
       const DenseSet masked_neighbourhood_a = graph.neighbourhood(node_a).intersection(present_nodes);
       Node neighbourhood_node = masked_neighbourhood_a.first();
+
+      if(neighbourhood_node == INVALID_NODE){ //It can happen that the neighbourhood is empty. Low degree criterion will remove this node
+         continue;
+      }
       //TODO: it might be worth to heuristically select a node with a small neighbourhood as initial point to speed up the termination of below loop,
       //particularly for larger graphs
       DenseSet possible_dominating_nodes = graph.neighbourhood(neighbourhood_node).intersection(present_nodes);
@@ -243,6 +301,12 @@ void PreprocessedMap::clear() {
    oldToNewIDs.clear();
 }
 void PreprocessedMap::extend(const PreprocessedMap &t_map) {
+   for(const auto& fixed_set : t_map.fixed_sets){
+      DenseSet transformedFixed(oldToNewIDs.size());
+      newToOldIDs.transform(fixed_set,transformedFixed);
+      fixed_sets.push_back(transformedFixed);
+   }
+
    //change the id's of the map which extends this
     std::vector<PreprocessedNode> newly_removed_nodes = t_map.removed_nodes;
     for(auto& node : newly_removed_nodes){
@@ -400,13 +464,14 @@ fixStableNeighbourhoods(const DenseGraph &graph, DenseSet &present_nodes){
                break;
             }
             disallowed_nodes.add(setNode);
-            disallowed_nodes.inplaceUnion(graph.neighbourhood(setNode)); //no need to constrain to intersection here
+            //Technically we would need to intersect the neighbourhood in the next line with present_nodes
+            //however, we only check for nodes within the present set of nodes, so this is fine anyways
+            disallowed_nodes.inplaceUnion(graph.neighbourhood(setNode));
          }
          if(setIsStable){
             found = true;
             fixedSets.push_back(set);
             present_nodes.inplaceDifference(set);
-            break;
          }
       }
    } while(found);
