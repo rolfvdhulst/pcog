@@ -12,7 +12,7 @@ DenseReductionGraph::DenseReductionGraph(const DenseGraph &graph)
       degrees[i] = graph.neighbourhood(i).size();
    }
 }
-void DenseReductionGraph::removeNode(Node node) {
+void DenseReductionGraph::removeGraphNode(Node node) {
    assert(presentNodes.contains(node));
    presentNodes.remove(node);
    for(Node neighbour : adjacencyMatrix[node]){
@@ -65,6 +65,27 @@ std::size_t DenseReductionGraph::lowerBound() const {
 }
 const DenseSet &DenseReductionGraph::lowerBoundNodes() const {
    return cliqueNodes;
+}
+void DenseReductionGraph::setLowerBoundClique(const DenseSet &clique,
+                                              std::size_t numCliqueNodes ) {
+   assert(clique.size() == numCliqueNodes);
+   assert(clique.intersection(presentNodes).size() == numCliqueNodes);
+   cliqueNodes = clique;
+   lowerbound = numCliqueNodes;
+}
+void DenseReductionGraph::removeNode(Node node) {
+   removeGraphNode(node);
+   if(hasLowerBound() && lowerBoundNodes().contains(node)){
+      --lowerbound;
+   }
+}
+void DenseReductionGraph::removeStableSet(const DenseSet &set) {
+   for(const auto& node : set){
+      removeGraphNode(node);
+   }
+   if(hasLowerBound() && !lowerBoundNodes().intersection(set).empty()){
+      --lowerbound;
+   }
 }
 
 }

@@ -29,7 +29,7 @@ bool dominatedReduceNodeDense(Node node,
          DominatedReduction reduction(node,candidateDominating);
          stack.push(reduction);
          for(const auto& neighbour : graph.neighbourhood(node)){
-            queue.push(neighbour);
+            queue.push(neighbour,graph.lowerBoundNodes().contains(neighbour));
          }
          graph.removeNode(node);
          return true;
@@ -72,7 +72,7 @@ bool dominatedReduceNode(Node node,
    DominatedReduction reduction(node,dominatingNode);
    stack.push(reduction);
    for(const auto& neighbour : nodeNeighbourhood){
-      queue.push(neighbour);
+      queue.push(neighbour,graph.lowerBoundNodes().contains(neighbour));
    }
    graph.removeNode(node);
    return true;

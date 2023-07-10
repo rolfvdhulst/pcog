@@ -8,10 +8,10 @@
 namespace pcog {
 class ReductionVertexQueue {
  public:
-   ReductionVertexQueue(std::size_t numNodes, bool allInitiallyPresent);
+   ReductionVertexQueue(const DenseSet& lowPriorityNodes);
    [[nodiscard]] std::size_t size() const;
    [[nodiscard]] bool empty() const;
-   void push(Node node);
+   void push(Node node, bool isLowPriority);
    Node pop();
  private:
    DenseSet inQueue;
@@ -19,6 +19,11 @@ class ReductionVertexQueue {
    std::size_t head;
    std::size_t tail;
    std::size_t queueSize;
+
+   std::vector<Node> lowPriorityQueueArray;
+   std::size_t lowPriorityHead;
+   std::size_t lowPriorityTail;
+   std::size_t lowPriorityQueueSize;
 
 };
 }

@@ -10,6 +10,7 @@
 #include "DenseReductionGraph.hpp"
 namespace pcog{
 
+DenseSet greedyClique(const DenseReductionGraph& t_graph);
 void reduceGraph(const DenseGraph& graph);
 }
 

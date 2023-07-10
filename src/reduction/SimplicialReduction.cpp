@@ -33,12 +33,10 @@ bool simplicialReduceNode(Node node,
    //As a by-result, disallowed_nodes already exactly contains all of the affected neighbours,
    for(const auto& neighbour : disallowed_nodes){
       assert(graph.containsNode(neighbour));
-      queue.push(neighbour);
+      queue.push(neighbour,graph.lowerBoundNodes().contains(neighbour));
    }
 
-   for(Node setNode : set){
-      graph.removeNode(setNode);
-   }
+   graph.removeStableSet(set);
    return true;
 }
 SimplicialReduction::SimplicialReduction(Node node, DenseSet set) : node{node}, set{set}{}

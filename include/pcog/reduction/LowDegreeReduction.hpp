@@ -15,7 +15,7 @@ struct LowDegreeReduction {
    DenseSet neighbours;
 };
 
-void lowDegreeReduceNode(Node node,
+bool lowDegreeReduceNode(Node node,
                    DenseReductionGraph& graph,
                    ReductionStack& stack,
                    ReductionVertexQueue& queue
