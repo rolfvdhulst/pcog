@@ -1,0 +1,30 @@
+//
+// Created by rolf on 10-7-23.
+//
+
+#ifndef PCOG_SRC_REDUCTION_FOLDDEGREETWOREDUCTION_HPP
+#define PCOG_SRC_REDUCTION_FOLDDEGREETWOREDUCTION_HPP
+
+#include "DenseReductionGraph.hpp"
+#include "ReductionVertexQueue.hpp"
+
+namespace pcog {
+class ReductionStack;
+///This reduction handles some nodes which have degree 2 in the complement graph,
+/// e.g. which only have two non-neighbours in the current graph
+struct FoldDegreeTwoReduction {
+   FoldDegreeTwoReduction(Node node, Node kept, Node removed)
+       : degree2Node{node}, keptNode{kept}, removedNode{removed}{};
+   Node degree2Node;
+   Node keptNode;
+   Node removedNode;
+};
+
+bool foldDegreeTwoReduceNode(Node node,
+                         DenseReductionGraph& graph,
+                         ReductionStack& stack,
+                         ReductionVertexQueue& queue
+);
+}
+
+#endif // PCOG_SRC_REDUCTION_FOLDDEGREETWOREDUCTION_HPP

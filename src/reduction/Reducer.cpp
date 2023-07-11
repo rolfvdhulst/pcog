@@ -51,7 +51,7 @@ void reduceGraph(const DenseGraph& graph){
    auto start = std::chrono::high_resolution_clock::now();
    std::cout<<"Original graph has: "<<graph.numNodes()<<" nodes\n";
    DenseReductionGraph redGraph(graph);
-   DenseSet clique = greedyClique(redGraph);
+   DenseSet clique = greedyClique(redGraph); //TODO: add more advanced way to find clique
    redGraph.setLowerBoundClique(clique,clique.size());
    ReductionStack result;
    ReductionVertexQueue queue(clique);
@@ -70,6 +70,10 @@ void reduceGraph(const DenseGraph& graph){
       }
       else if(dominatedReduceNode(node,redGraph,result,queue)){
          std::cout<<"Dominated!\n";
+         continue;
+      }
+      else if(foldDegreeTwoReduceNode(node,redGraph,result,queue)){
+         std::cout<<"Degree two reduced!\n";
          continue;
       }
    }

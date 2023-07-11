@@ -5,12 +5,14 @@
 #include "pcog/reduction/DenseReductionGraph.hpp"
 namespace pcog{
 DenseReductionGraph::DenseReductionGraph(const DenseGraph &graph)
-: adjacencyMatrix(graph.numNodes()), presentNodes(graph.numNodes(),true){
+: adjacencyMatrix(graph.numNodes()), presentNodes(graph.numNodes(),true),
+      nodeCount(graph.numNodes()){
    degrees.resize(graph.numNodes());
    for(std::size_t i = 0; i < graph.numNodes(); ++i){
       adjacencyMatrix[i] = graph.neighbourhood(i);
       degrees[i] = graph.neighbourhood(i).size();
    }
+
 }
 void DenseReductionGraph::removeGraphNode(Node node) {
    assert(presentNodes.contains(node));
@@ -22,6 +24,7 @@ void DenseReductionGraph::removeGraphNode(Node node) {
    }
    degrees[node] = 0;
    adjacencyMatrix[node].clear();
+   --nodeCount;
 }
 const DenseSet &DenseReductionGraph::neighbourhood(Node node) const {
    return adjacencyMatrix[node];
@@ -86,6 +89,29 @@ void DenseReductionGraph::removeStableSet(const DenseSet &set) {
    if(hasLowerBound() && !lowerBoundNodes().intersection(set).empty()){
       --lowerbound;
    }
+}
+std::size_t DenseReductionGraph::numNodes() const {
+   return nodeCount;
+}
+void DenseReductionGraph::removeNodeEdges(Node node,
+                                               const DenseSet &otherNodes) {
+   assert(presentNodes.contains(node));
+   //check that each node given indeed forms an edge
+   assert(otherNodes.isSubsetOf(neighbourhood(node)));
+#ifndef NDEBUG
+   //check that we do not remove edges which should belong to the maximal clique
+   for(const auto& otherNode : otherNodes){
+      assert(!(lowerBoundNodes().contains(node) && lowerBoundNodes().contains(otherNode)));
+   }
+#endif
+
+   for(const auto& otherNode : otherNodes){
+      assert(adjacencyMatrix[otherNode].contains(node));
+      adjacencyMatrix[otherNode].remove(node);
+      --degrees[otherNode];
+   }
+   adjacencyMatrix[node].inplaceDifference(otherNodes);
+   degrees[node] -= otherNodes.size();
 }
 
 }
