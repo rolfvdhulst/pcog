@@ -91,9 +91,9 @@ std::optional<DenseGraph> DimacsFileHeader::ReadAsDense() {
          auto substring = line.substr(2);
          std::size_t index = 0;
          try {
-            std::size_t v1 = std::stoul(substring, &index) - 1;
+            std::size_t v1 = std::stoul(substring, &index);
             auto smallerSubstring = substring.substr(index);
-            std::size_t v2 = std::stoul(smallerSubstring, &index) - 1;
+            std::size_t v2 = std::stoul(smallerSubstring, &index);
             graph.addEdge(v1, v2);
          } catch (std::invalid_argument &error) {
             return std::nullopt;

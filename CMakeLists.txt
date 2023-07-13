@@ -136,6 +136,8 @@ set(sources
         include/pcog/reduction/Reducer.hpp
         src/reduction/FoldDegreeTwoReduction.cpp
         include/pcog/reduction/FoldDegreeTwoReduction.hpp
+        src/reduction/TwinDegreeThreeReduction.cpp
+        include/pcog/reduction/TwinDegreeThreeReduction.hpp
         )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources})
 

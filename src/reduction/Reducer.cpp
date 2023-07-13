@@ -68,14 +68,20 @@ void reduceGraph(const DenseGraph& graph){
          std::cout<<"Low degree!\n";
          continue;
       }
-      else if(dominatedReduceNode(node,redGraph,result,queue)){
-         std::cout<<"Dominated!\n";
-         continue;
-      }
       else if(foldDegreeTwoReduceNode(node,redGraph,result,queue)){
          std::cout<<"Degree two reduced!\n";
          continue;
       }
+      else if(twinDegreeThreeReduction(node,redGraph,result,queue)){
+         std::cout<<"Twin degree 3 reduced!\n";
+         continue;
+      }
+      else if(dominatedReduceNode(node,redGraph,result,queue)){
+         std::cout<<"Dominated!\n";
+         continue;
+      }
+
+
    }
 
    std::cout<<"Preprocessed graph has: "<<redGraph.nodes().size()<<" nodes\n";

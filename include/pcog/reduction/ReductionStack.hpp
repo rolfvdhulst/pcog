@@ -9,8 +9,11 @@
 #include "DominatedReduction.hpp"
 #include "SimplicialReduction.hpp"
 #include "FoldDegreeTwoReduction.hpp"
+#include "TwinDegreeThreeReduction.hpp"
+
 namespace pcog{
-using Reduction = std::variant<LowDegreeReduction,DominatedReduction,SimplicialReduction,FoldDegreeTwoReduction>;
+using Reduction = std::variant<LowDegreeReduction,DominatedReduction,SimplicialReduction,
+                               FoldDegreeTwoReduction,TwinDegreeThreeReduction>;
 class ReductionStack {
  public:
    void push(const Reduction& reduction);

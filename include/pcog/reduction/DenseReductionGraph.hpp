@@ -13,6 +13,7 @@ class DenseReductionGraph {
    void removeNode(Node node);
    void removeStableSet(const DenseSet& set);
    void removeNodeEdges(Node node, const DenseSet& otherNodes);
+   DenseSet complementNeighbourhood(Node node) const;
    [[nodiscard]] const DenseSet& neighbourhood(Node node) const;
    [[nodiscard]] const DenseSet& nodes() const;
    [[nodiscard]] std::size_t numNodes() const;

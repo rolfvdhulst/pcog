@@ -106,12 +106,19 @@ void DenseReductionGraph::removeNodeEdges(Node node,
 #endif
 
    for(const auto& otherNode : otherNodes){
+      assert(nodes().contains(otherNode));
       assert(adjacencyMatrix[otherNode].contains(node));
       adjacencyMatrix[otherNode].remove(node);
       --degrees[otherNode];
    }
    adjacencyMatrix[node].inplaceDifference(otherNodes);
    degrees[node] -= otherNodes.size();
+}
+DenseSet DenseReductionGraph::complementNeighbourhood(Node node) const {
+   DenseSet complement = neighbourhood(node);
+   complement.complement().inplaceIntersection(nodes());
+   complement.remove(node);
+   return complement;
 }
 
 }
