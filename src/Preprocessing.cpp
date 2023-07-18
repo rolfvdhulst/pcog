@@ -86,7 +86,7 @@ std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOr
             subgraph = findInitialClique(t_graph);
             subgraphBound = subgraph->size();
             for(const auto& set : fixed_sets){
-               if(set.intersection(subgraph.value()).any()){
+               if(set.intersects(subgraph.value())){
                   ++fixedSubgraphColors;
                }
             }
@@ -123,7 +123,7 @@ std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOr
                removed_nodes.emplace_back(node,PreprocessedReason::STABLE_NEIGHBOURHOOD,fixed_sets.size());
                removeNode(node);
             }
-            if(subgraph.has_value() && set.intersection(subgraph.value()).any()){
+            if(subgraph.has_value() && set.intersects(subgraph.value())){
                ++fixedSubgraphColors;
             }
             fixed_sets.push_back(set);

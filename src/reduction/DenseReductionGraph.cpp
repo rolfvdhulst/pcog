@@ -86,7 +86,7 @@ void DenseReductionGraph::removeStableSet(const DenseSet &set) {
    for(const auto& node : set){
       removeGraphNode(node);
    }
-   if(hasLowerBound() && !lowerBoundNodes().intersection(set).empty()){
+   if(hasLowerBound() && lowerBoundNodes().intersects(set)){
       --lowerbound;
    }
 }

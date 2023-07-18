@@ -146,6 +146,9 @@ DenseSet &DenseSet::extend(bool value) {
    m_bitset.push_back(value);
    return *this;
 }
+bool DenseSet::intersects(const DenseSet &other) const {
+   return m_bitset.intersects(other.m_bitset);
+}
 
 DenseSet::ConstIterator::ConstIterator(const DenseSet &t_set,
                                        Element t_position)

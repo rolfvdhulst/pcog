@@ -129,6 +129,11 @@ class DenseSet {
    /// \return true if this is a proper subset of other, false otherwise
    [[nodiscard]] bool isProperSubsetOf(const DenseSet &other) const;
 
+   ///Checks if this set and the other set have an element in common
+   /// \param other the other set.
+   /// \return true if they have an element in common, false otherwise
+   [[nodiscard]] bool intersects(const DenseSet& other) const;
+
    // Modifying functions
 
    /// Increases the capacity of this set by 1 and sets the newly added bit to

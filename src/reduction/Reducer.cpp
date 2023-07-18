@@ -30,7 +30,7 @@ DenseSet greedyClique(const DenseReductionGraph& t_graph){
       bestDegree = 0;
       for(const auto& candidate : candidates){
          std::size_t degree = t_graph.neighbourhood(candidate).intersection(candidates).size();
-         if(degree > bestDegree){
+         if(degree > bestDegree || bestNode == INVALID_NODE){
             bestDegree = degree;
             bestNode = candidate;
          }
@@ -52,39 +52,54 @@ void reduceGraph(const DenseGraph& graph){
    std::cout<<"Original graph has: "<<graph.numNodes()<<" nodes\n";
    DenseReductionGraph redGraph(graph);
    DenseSet clique = greedyClique(redGraph); //TODO: add more advanced way to find clique
+   std::cout<<"Clique of size: "<<clique.size()<<" found\n";
    redGraph.setLowerBoundClique(clique,clique.size());
    ReductionStack result;
    ReductionVertexQueue queue(clique);
    while(!queue.empty()){
-      Node node = queue.pop();
-      if(!redGraph.containsNode(node)){
-         continue;
-      }
-      if(simplicialReduceNode(node,redGraph,result,queue)){
-         std::cout<<"Fixed set!\n";
-         continue;
-      }
-      else if(lowDegreeReduceNode(node,redGraph,result,queue)){
-         std::cout<<"Low degree!\n";
-         continue;
-      }
-      else if(foldDegreeTwoReduceNode(node,redGraph,result,queue)){
-         std::cout<<"Degree two reduced!\n";
-         continue;
-      }
-      else if(twinDegreeThreeReduction(node,redGraph,result,queue)){
-         std::cout<<"Twin degree 3 reduced!\n";
-         continue;
-      }
-      else if(dominatedReduceNode(node,redGraph,result,queue)){
-         std::cout<<"Dominated!\n";
-         continue;
-      }
+      while(!queue.empty()){
+         Node node = queue.pop();
+         if(!redGraph.containsNode(node)){
+            continue;
+         }
 
+         if(simplicialReduceNode(node,redGraph,result,queue)){
+            std::cout<<"Fixed set!\n";
+            continue;
+         }
+         else if(lowDegreeReduceNode(node,redGraph,result,queue)){
+            std::cout<<"Low degree!\n";
+            continue;
+         }
+         else if(foldDegreeTwoReduceNode(node,redGraph,result,queue)){
+            std::cout<<"Degree two reduced!\n";
+            continue;
+         }
+         else if(twinDegreeThreeReduction(node,redGraph,result,queue)){
+            std::cout<<"Twin degree 3 reduced!\n";
+            continue;
+         }
+         else if(dominatedReduceNode(node,redGraph,result,queue)){
+            std::cout<<"Dominated!\n";
+            continue;
+         }
 
+      }
+      if(findCrownReductions(redGraph,result,queue)){
+         std::cout<<"Crown reductions performed!\n";
+         continue;
+      }
+      else{
+         for(const auto& node : redGraph.nodes()){
+            if(twoFixingReduceNode(node,redGraph,result,queue)){ //TODO: expensive, find ways to make cheaper to compute / lower priority
+               std::cout<<"Double fixing performed!\n";
+               continue;
+            }
+         }
+      }
    }
 
-   std::cout<<"Preprocessed graph has: "<<redGraph.nodes().size()<<" nodes\n";
+   std::cout<<"Preprocessed graph has: "<<redGraph.nodes().size()<<" nodes,"<< result.numFixedColors()<<" fixed colors\n";
    auto end = std::chrono::high_resolution_clock::now();
    std::cout<<"Took: "<< std::chrono::duration_cast<std::chrono::milliseconds>(end-start)<<"\n";
 }

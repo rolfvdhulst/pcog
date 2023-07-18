@@ -21,8 +21,7 @@ SetColoring GreedyColoring::run_degree_node() const {
       const auto& neighbourhood = graph.neighbourhood(considered_node);
       bool none_found = true;
       for(auto& color : coloring.colors()){
-         DenseSet intersection = neighbourhood.intersection(color);
-         if(intersection.empty()){
+         if(!neighbourhood.intersects(color)){
             color.add(considered_node);
             none_found = false;
             break;

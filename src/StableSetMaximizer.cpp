@@ -23,9 +23,7 @@ void StableSetMaximizer::maximizeDegree(DenseSet &set,
              });
    for (const auto &node_degree_pair : node_degrees) {
       if (!set.contains(node_degree_pair.first)) {
-         if (graph.neighbourhood(node_degree_pair.first)
-                 .intersection(set)
-                 .empty()) {
+         if (!graph.neighbourhood(node_degree_pair.first).intersects(set)) {
             set.add(node_degree_pair.first);
          }
       }
@@ -39,7 +37,7 @@ void StableSetMaximizer::maximizeRandomly(DenseSet &set,
    std::shuffle(nodes.begin(), nodes.end(), random_engine);
    for (const auto &node : nodes) {
       if (!set.contains(node)) {
-         if (graph.neighbourhood(node).intersection(set).empty()) {
+         if (!graph.neighbourhood(node).intersects(set)) {
             set.add(node);
          }
       }

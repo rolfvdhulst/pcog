@@ -1120,6 +1120,8 @@ ColorNodeWorker::pickChildNode(NodeChildSelectionStrategy strategy,
       return children[dist(m_random_engine)];
    }
    }
+   assert(false); // should not happen
+   return children.front(); //TODO:
 }
 void ColorNodeWorker::runLoop(SolutionData &t_soldata, std::atomic_bool& stop) {
    while(!stop){
