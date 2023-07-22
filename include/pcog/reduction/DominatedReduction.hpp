@@ -7,6 +7,7 @@
 
 #include "DenseReductionGraph.hpp"
 #include "ReductionVertexQueue.hpp"
+#include "pcog/utilities/Coloring.hpp"
 
 namespace pcog {
 class ReductionStack;
@@ -14,6 +15,9 @@ struct DominatedReduction {
    DominatedReduction(Node node, Node dominatingNode);
    Node node;
    Node dominatedBy;
+
+   void transformStableSet(DenseSet& set) const;
+   void newToOldColoring(NodeColoring &coloring) const;
 };
 
 bool dominatedReduceNodeDense(Node node,

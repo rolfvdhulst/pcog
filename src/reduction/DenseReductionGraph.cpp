@@ -120,5 +120,37 @@ DenseSet DenseReductionGraph::complementNeighbourhood(Node node) const {
    complement.remove(node);
    return complement;
 }
+InducedGraph DenseReductionGraph::currentGraph() const {
+   std::size_t new_size = nodes().size();
+   InducedGraph induced;
+   induced.graph = DenseGraph(new_size);
+   induced.newToOld = NodeMap(new_size);
+
+   std::size_t i = 0;
+   for(Node node : nodes()){
+      induced.newToOld[i] = node;
+      ++i;
+   }
+   induced.oldToNew = NodeMap::inverse(induced.newToOld,nodes().capacity());
+   i = 0;
+   for(Node node : nodes()){
+      induced.oldToNew.transform(adjacencyMatrix[node],induced.graph.mutableNeighbourhood(i));
+      ++i;
+   }
+#ifndef NDEBUG
+   for(Node node : nodes()){
+      for(Node other : nodes()){
+         assert(adjacencyMatrix[node].contains(other)  == adjacencyMatrix[other].contains(node));
+         if(adjacencyMatrix[node].contains(other)){
+            assert(induced.graph.isEdge(induced.oldToNew[node],induced.oldToNew[other]));
+         }else{
+            assert(!induced.graph.isEdge(induced.oldToNew[node],induced.oldToNew[other]));
+
+         }
+      }
+   }
+#endif
+   return induced;
+}
 
 }

@@ -30,6 +30,7 @@
 
 
 #include <thread>
+#include "pcog/reduction/Reducer.hpp"
 
 namespace pcog {
 // Stackoverflow solution to get memory used by the process. Not perfect.
@@ -139,14 +140,14 @@ std::size_t SolutionData::upperBoundUnscaled() {
 }
 
 std::size_t SolutionData::upperBound() {
-   return upperBoundUnscaled() + m_preprocessedToOriginal.fixed_sets.size();
+   return upperBoundUnscaled() + m_preprocessingStack.numFixedColors();
 }
 std::size_t SolutionData::lowerBound() {
-   return lowerBoundUnscaled() + m_preprocessedToOriginal.fixed_sets.size();
+   return lowerBoundUnscaled() + m_preprocessingStack.numFixedColors();
 }
 double SolutionData::fractionalLowerBound()  {
    std::scoped_lock guard(m_lowerBound_mutex);
-   return m_fractionalLowerBound + static_cast<double>(m_preprocessedToOriginal.fixed_sets.size());
+   return m_fractionalLowerBound + static_cast<double>(m_preprocessingStack.numFixedColors());
 }
 bool SolutionData::isNewSet(const DenseSet &t_set) const {
    return std::all_of(m_variables.begin(), m_variables.end(),
@@ -176,7 +177,9 @@ SolutionData::SolutionData( Settings& t_settings)
 void SolutionData::reset(DenseGraph t_graph) {
    m_originalGraph = std::move(t_graph);
    m_preprocessedGraph.clear();
-   m_preprocessedToOriginal.clear();
+   m_preprocessedToOriginalMap.clear();
+   m_originalToPreprocessedMap.clear();
+   m_preprocessingStack.clear();
    m_variables.clear();
    m_colorings.clear();
    m_tree.clear();
@@ -262,26 +265,27 @@ void SolutionData::doPresolve() {
    std::cout<<"DSATUR found " << coloring.numColors()<<"-coloring\n";
 
    std::cout<<"Original graph has " <<m_originalGraph.numNodes()<<" nodes, density: "<< m_originalGraph.density()*100.0<<"%\n";
-   auto [result,certificate] = preprocessOriginalGraph(m_originalGraph, coloring.numColors());
-   std::cout<<"Presolved graph has "<<result.graph.numNodes()<<" nodes, density: "<< result.graph.density()*100.0<<"%\n";
+   auto result = reduceGraph(m_originalGraph);
+   std::cout<<"Presolved graph has "<<result.graph.graph.numNodes()<<" nodes, density: "<< result.graph.graph.density()*100.0<<"%\n";
 
-   m_preprocessedGraph = result.graph;
-   m_preprocessedToOriginal = result.map;
-
-   //TODO: how to deal with fixing of certificate stable sets and resulting bound changes?
-   std::size_t lb = certificate.has_value() && result.map.fixed_sets.empty() ? certificate->bound : 0;
+   m_preprocessedGraph = result.graph.graph;
+   m_preprocessingStack = result.stack;
+   m_preprocessedToOriginalMap = result.graph.newToOld;
+   m_originalToPreprocessedMap = result.graph.oldToNew;
+   std::size_t lb = result.lowerBoundClique.size();
+   assert(m_preprocessedGraph.setIsClique(result.lowerBoundClique));
 
 
    //Project coloring to preprocessed graph
    SetColoring projectedColoring;
    for(const auto& color : coloring.colors()) {
       DenseSet set(m_preprocessedGraph.numNodes());
-      m_preprocessedToOriginal.oldToNewIDs.transform(color,set);
-      //TODO: maximize stable sets here?
+      m_originalToPreprocessedMap.transform(color,set);
       if(!set.empty()) {
          projectedColoring.addColor(set);
       }
    }
+   //TODO: re-run DSATUR, maybe?
    NodeColoring initialColoring(m_preprocessedGraph.numNodes(),projectedColoring);
 
 
@@ -371,14 +375,12 @@ std::vector<node_id> SolutionData::createChildren(const BBNode& t_node,
 const DenseGraph &SolutionData::preprocessedGraph() const {
    return m_preprocessedGraph;
 }
-const PreprocessedMap &SolutionData::preprocessingMap() const {
-   return m_preprocessedToOriginal;
-}
+
 const NodeMap &SolutionData::preprocessedToOriginal() const {
-   return m_preprocessedToOriginal.newToOldIDs;
+   return m_preprocessedToOriginalMap;
 }
 const NodeMap &SolutionData::originalToPreprocessed() const {
-   return m_preprocessedToOriginal.oldToNewIDs;
+   return m_originalToPreprocessedMap;
 }
 
 
@@ -392,8 +394,22 @@ SetColoring SolutionData::incumbentUnscaled() const {
 NodeColoring SolutionData::incumbent() const {
    SetColoring preprocessedSol = incumbentUnscaled();
    NodeColoring preprocessedCol(m_preprocessedGraph.numNodes(),preprocessedSol);
-   NodeColoring originalCol = extendColoring(preprocessedCol,m_preprocessedToOriginal,m_originalGraph);
-   return originalCol;
+
+   NodeColoring originalColoring(m_originalToPreprocessedMap.size());
+   for(std::size_t i = 0; i < preprocessedCol.numNodes(); ++i) {
+      originalColoring[m_preprocessedToOriginalMap[i]] = preprocessedCol[i];
+   }
+   originalColoring.setNumColors(preprocessedCol.numColors());
+   m_preprocessingStack.newToOldColoring(originalColoring);
+#ifndef NDEBUG
+   for(std::size_t i = 0; i < originalColoring.numNodes(); ++i) {
+      assert(originalColoring[i] != INVALID_COLOR);
+      for(const auto& neighbour : m_originalGraph.neighbourhood(i)) {
+         assert(originalColoring[i] != originalColoring[neighbour]);
+      }
+   }
+#endif
+   return originalColoring;
 }
 
 void SolutionData::synchronizeLocalDataStatistics(LocalSolutionData &t_localData) {

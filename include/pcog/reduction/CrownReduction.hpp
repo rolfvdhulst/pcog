@@ -7,6 +7,7 @@
 
 #include "DenseReductionGraph.hpp"
 #include "ReductionVertexQueue.hpp"
+#include "pcog/utilities/Coloring.hpp"
 
 namespace pcog {
 class ReductionStack;
@@ -14,6 +15,9 @@ class ReductionStack;
 /// e.g. which only have two non-neighbours in the current graph
 struct CrownReduction {
    std::vector<DenseSet> fixedSets;
+
+   void transformStableSet(DenseSet& set) const;
+   void newToOldColoring(NodeColoring &coloring) const;
 };
 
 bool findCrownReductions(DenseReductionGraph& graph,

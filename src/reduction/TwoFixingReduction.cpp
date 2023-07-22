@@ -117,28 +117,68 @@ std::vector<DenseSet> attemptTwoFixing(Node first, Node second,
    return {firstMinSecond,secondMinFirst};
 }
 
+bool attemptApplyTwoFixing(Node node, Node other, DenseReductionGraph& graph, ReductionStack& stack,
+                           ReductionVertexQueue& queue){
+   auto fixedSets = attemptTwoFixing(node,other,graph);
+   if(fixedSets.empty()){
+      return false;
+   }
+   // TODO: double check that found sets are indeed stable in the graph
+   TwoFixingReduction reduction{
+       .firstNode = node,
+       .secondNode = other,
+       .firstSet = fixedSets.front(),
+       .secondSet = fixedSets.back(),
+   };
+   stack.push(reduction);
+   graph.removeStableSet(reduction.firstSet);
+   graph.removeStableSet(reduction.secondSet);
+   // TODO: think about what nodes to push
+   for (Node graphNode : graph.nodes()) {
+      queue.push(graphNode, graph.lowerBoundNodes().contains(graphNode));
+   }
+   return true;
+}
+
 bool twoFixingReduceNode(Node node, DenseReductionGraph &graph,
                          ReductionStack &stack, ReductionVertexQueue &queue) {
    for(Node other : graph.neighbourhood(node)){
-      auto fixedSets = attemptTwoFixing(node,other,graph);
-      if(!fixedSets.empty()){
-         //TODO: double check that found sets are indeed stable in the graph
-         TwoFixingReduction reduction{
-            .firstNode = node,
-            .secondNode = other,
-            .firstSet = fixedSets.front(),
-            .secondSet = fixedSets.back(),
-         };
-         stack.push(reduction);
-         graph.removeStableSet(reduction.firstSet);
-         graph.removeStableSet(reduction.secondSet);
-         //TODO: think about what nodes to push
-         for(Node graphNode : graph.nodes()){
-            queue.push(graphNode,graph.lowerBoundNodes().contains(graphNode));
-         }
+      if(attemptApplyTwoFixing(node,other,graph,stack,queue)){
          return true;
       }
    }
    return false;
+}
+bool findTwoFixings(DenseReductionGraph& graph,
+                    ReductionStack& stack,
+                    ReductionVertexQueue& queue) {
+   for (Node node : graph.nodes()) {
+      for (Node neighbour : graph.neighbourhood(node)) {
+         if (neighbour >= node) {
+            break;
+         }
+         if (attemptApplyTwoFixing(node, neighbour, graph, stack, queue)) {
+            return true;
+         }
+      }
+   }
+   return false;
+}
+void TwoFixingReduction::transformStableSet(DenseSet &) const {
+   //no-op, removed
+}
+void TwoFixingReduction::newToOldColoring(NodeColoring &coloring) const {
+   std::size_t count = coloring.numColors();
+   for (Node fixed : firstSet) {
+      assert(coloring[fixed] == INVALID_COLOR);
+      coloring[fixed] = count;
+   }
+   ++count;
+   for (Node fixed : secondSet) {
+      assert(coloring[fixed] == INVALID_COLOR);
+      coloring[fixed] = count;
+   }
+   ++count;
+   coloring.setNumColors(count);
 }
 }

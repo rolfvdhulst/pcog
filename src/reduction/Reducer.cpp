@@ -47,12 +47,10 @@ DenseSet greedyClique(const DenseReductionGraph& t_graph){
    return clique;
 }
 
-void reduceGraph(const DenseGraph& graph){
-   auto start = std::chrono::high_resolution_clock::now();
-   std::cout<<"Original graph has: "<<graph.numNodes()<<" nodes\n";
+ReductionResult reduceGraph(const DenseGraph& graph){
+
    DenseReductionGraph redGraph(graph);
    DenseSet clique = greedyClique(redGraph); //TODO: add more advanced way to find clique
-   std::cout<<"Clique of size: "<<clique.size()<<" found\n";
    redGraph.setLowerBoundClique(clique,clique.size());
    ReductionStack result;
    ReductionVertexQueue queue(clique);
@@ -89,19 +87,22 @@ void reduceGraph(const DenseGraph& graph){
          std::cout<<"Crown reductions performed!\n";
          continue;
       }
-      else{
-         for(const auto& node : redGraph.nodes()){
-            if(twoFixingReduceNode(node,redGraph,result,queue)){ //TODO: expensive, find ways to make cheaper to compute / lower priority
-               std::cout<<"Double fixing performed!\n";
-               continue;
-            }
-         }
+      else if(findTwoFixings(redGraph,result,queue)){
+         std::cout << "Double fixing applied!\n";
+         continue;
       }
    }
 
-   std::cout<<"Preprocessed graph has: "<<redGraph.nodes().size()<<" nodes,"<< result.numFixedColors()<<" fixed colors\n";
-   auto end = std::chrono::high_resolution_clock::now();
-   std::cout<<"Took: "<< std::chrono::duration_cast<std::chrono::milliseconds>(end-start)<<"\n";
+
+   InducedGraph reduced = redGraph.currentGraph();
+   DenseSet reducedClique(reduced.newToOld.size(),false);
+   reduced.oldToNew.transform(redGraph.lowerBoundNodes(),reducedClique);
+   return ReductionResult{
+       .graph = reduced,
+       .stack = result,
+       .lowerBoundClique = reducedClique
+   };
+
 }
 
 }

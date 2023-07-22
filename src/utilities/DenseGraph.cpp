@@ -14,6 +14,7 @@ void DenseGraph::addEdge(Node a, Node b) {
 }
 
 bool DenseGraph::isEdge(Node a, Node b) const {
+   assert(m_adjacencyMatrix[a].contains(b) == m_adjacencyMatrix[b].contains(a));
    return m_adjacencyMatrix[a].contains(b);
 }
 
@@ -173,5 +174,19 @@ double DenseGraph::density() const {
    double density = static_cast<double>(2*numEdges()) /
                     static_cast<double>(nodes*(nodes-1));
    return density;
+}
+DenseSet& DenseGraph::mutableNeighbourhood(Node t_node){
+return m_adjacencyMatrix[t_node];
+}
+bool DenseGraph::setIsClique(const DenseSet &set) const {
+DenseSet temp(set);
+for(Node node : set){
+      temp.remove(node);
+      if(!temp.isSubsetOf(neighbourhood(node))){
+         return false;
+      }
+      temp.add(node);
+}
+return true;
 }
 } // namespace pcog

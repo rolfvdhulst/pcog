@@ -69,6 +69,8 @@ class DenseGraph {
    /// \param t_node The node to get the neighbourhood for
    /// \return The neighbourhood of the node
    [[nodiscard]] const DenseSet &neighbourhood(Node t_node) const;
+
+   DenseSet& mutableNeighbourhood(Node t_node);
    /// Returns the degree of the given node, the number of adjacent adges
    /// \param t_node The node to return the degree for
    /// \return The degree of the given node
@@ -98,6 +100,8 @@ class DenseGraph {
    /// t_set \param t_set The set to check \return True if the set is maximally
    /// stable.
    [[nodiscard]] bool setIsStableMaximal(const DenseSet &t_set) const;
+
+   [[nodiscard]] bool setIsClique(const DenseSet& set) const;
 
    /// Computes the induced graph of the current graph based on a subset of
    /// vertices. The induced graph is formed by all vertices of the given subset

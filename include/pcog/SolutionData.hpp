@@ -8,12 +8,13 @@
 #include <utility>
 
 #include "BBNode.hpp"
-#include "pcog/utilities/DenseGraph.hpp"
-#include "pcog/utilities/DenseSet.hpp"
-#include "pcog/ColorNodeWorker.hpp"
 #include "LocalSolutionData.hpp"
 #include "Preprocessing.hpp"
 #include "Settings.hpp"
+#include "pcog/ColorNodeWorker.hpp"
+#include "pcog/reduction/ReductionStack.hpp"
+#include "pcog/utilities/DenseGraph.hpp"
+#include "pcog/utilities/DenseSet.hpp"
 
 namespace pcog {
 
@@ -26,7 +27,6 @@ class SolutionData {
    /// This data is only changed during presolve, not during branch-and-bound
    [[nodiscard]] const DenseGraph& originalGraph() const;
    [[nodiscard]] const DenseGraph& preprocessedGraph() const;
-   [[nodiscard]] const PreprocessedMap& preprocessingMap() const;
    [[nodiscard]] const NodeMap& preprocessedToOriginal() const;
    [[nodiscard]] const NodeMap& originalToPreprocessed() const;
 
@@ -93,7 +93,9 @@ class SolutionData {
    DenseGraph m_originalGraph;
    // Problem after presolving.
    DenseGraph m_preprocessedGraph;
-   PreprocessedMap m_preprocessedToOriginal;
+   ReductionStack m_preprocessingStack;
+   NodeMap m_preprocessedToOriginalMap;
+   NodeMap m_originalToPreprocessedMap;
 
    // Shared solution data, not constant. The variables, constraints and colorings are in terms of the preprocessed graph.
    std::mutex m_variable_mutex;

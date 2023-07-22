@@ -7,7 +7,6 @@
 #include <ranges>
 #include <utility>
 
-#include "pcog/reduction/Reducer.hpp"
 
 namespace pcog {
 PreprocessingResult::PreprocessingResult(DenseGraph graph, PreprocessedMap map)
@@ -42,7 +41,6 @@ DenseSet findInitialClique(const DenseGraph& t_graph){
 std::pair<PreprocessingResult,std::optional<LowerBoundCertificate>> preprocessOriginalGraph(const DenseGraph &t_graph,
                                             std::size_t coloringUpperBound) {
 
-   reduceGraph(t_graph);
    auto start = std::chrono::high_resolution_clock ::now();
 
    std::vector<PreprocessedNode> removed_nodes;

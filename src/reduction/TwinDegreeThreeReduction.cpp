@@ -64,7 +64,7 @@ bool twinDegreeThreeReduction(Node node, DenseReductionGraph &graph,
       graph.removeStableSet(firstSet);
       graph.removeStableSet(secondSet);
 
-      stack.push(TwinDegreeThreeReduction{.u= node,.v = twin,.w = w, .x = x,.y = y,.fold = false});
+      stack.push(TwinDegreeThreeReduction{.u= node,.v = twin,.uSet = firstSet,.vSet = secondSet});
       //TODO: what nodes to push to the queue? (perhaps intersection of neighbourhoods? or non-neighbourhoods)
       for(const auto& addNode : graph.nodes()){
          queue.push(addNode,graph.lowerBoundNodes().contains(addNode));
@@ -95,20 +95,108 @@ bool twinDegreeThreeReduction(Node node, DenseReductionGraph &graph,
       removeNode2 = y;
    }
    DenseSet keepRemoveNeighbours = graph.neighbourhood(keepNode);
-   DenseSet possibleRemoveEdges = graph.complementNeighbourhood(removeNode1).setUnion(graph.complementNeighbourhood(removeNode2));
+   DenseSet node1NonNeighbours = graph.complementNeighbourhood(removeNode1);
+   DenseSet node2NonNeighbours = graph.complementNeighbourhood(removeNode2);
+   DenseSet possibleRemoveEdges = node1NonNeighbours.setUnion(node2NonNeighbours);
    keepRemoveNeighbours.inplaceIntersection(possibleRemoveEdges);
+
+   DenseSet keepNonNeighbours = graph.complementNeighbourhood(keepNode);
+   //TODO: remove as stable sets, or is this good enough?
    graph.removeNode(node);
    graph.removeNode(twin);
    graph.removeNode(removeNode1);
    graph.removeNode(removeNode2);
    graph.removeNodeEdges(keepNode,keepRemoveNeighbours);
 
-   stack.push(TwinDegreeThreeReduction{.u= node,.v = twin,.w = w, .x = x,.y = y,.fold = true});
+   stack.push(TwinDegreeThreeFoldReduction{
+       .u= node,.v = twin,.keep = keepNode,.remove1 = removeNode1, .remove2 = removeNode2,
+       .keepNonNeighbours = keepNonNeighbours,.remove1NonNeighbours = node1NonNeighbours,
+       .remove2NonNeighbours = node2NonNeighbours,
+   });
    //TODO: what nodes to push to the queue? (perhaps intersection of neighbourhoods? or non-neighbourhoods)
    for(const auto& addNode : graph.nodes()){
       queue.push(addNode,graph.lowerBoundNodes().contains(addNode));
    }
 
    return true;
+}
+void TwinDegreeThreeReduction::transformStableSet(DenseSet &) const {
+   //no-op
+}
+void TwinDegreeThreeReduction::newToOldColoring(NodeColoring &coloring) const {
+   std::size_t count = coloring.numColors();
+   for (Node fixed : uSet) {
+      assert(coloring[fixed] == INVALID_COLOR);
+      coloring[fixed] = count;
+   }
+   ++count;
+   for (Node fixed : vSet) {
+      assert(coloring[fixed] == INVALID_COLOR);
+      coloring[fixed] = count;
+   }
+   ++count;
+   coloring.setNumColors(count);
+}
+void TwinDegreeThreeFoldReduction::transformStableSet(DenseSet &set) const {
+   //TODO: fix, not complete
+}
+void TwinDegreeThreeFoldReduction::newToOldColoring(NodeColoring &coloring) const {
+
+   assert(coloring[u] == INVALID_COLOR);
+   assert(coloring[v] == INVALID_COLOR);
+   assert(coloring[remove1] == INVALID_COLOR);
+   assert(coloring[remove2] == INVALID_COLOR);
+
+   assert(coloring[keep] != INVALID_COLOR);
+
+   Color keptNodeColor = coloring[keep];
+
+   assert(keptNodeColor != INVALID_COLOR);
+
+   bool inRemoveOneNonNeighbours = true;
+   bool inRemoveTwoNonNeighbours = true;
+   bool inKeptNonNeighbours = true;
+   for(std::size_t i = 0; i < coloring.numNodes(); ++i){
+      if(i == keep) continue;
+      if(keptNodeColor == coloring[i] ){
+         if(!remove1NonNeighbours.contains(i)){
+            inRemoveOneNonNeighbours = false;
+         }
+         if(!remove2NonNeighbours.contains(i)){
+            inRemoveTwoNonNeighbours = false;
+         }
+         if(!keepNonNeighbours.contains(i)){
+            inKeptNonNeighbours = false;
+         }
+         //TODO: add these lines after extensive testing
+         // they should provide a minor speedup but if there's a bug they also might cause us not to catch it as easily
+//         if((inRemoveOneNonNeighbours ? 1 : 0) + (inRemoveTwoNonNeighbours ? 1 : 0) + (inKeptNonNeighbours ? 1 : 0) <= 1){
+//            break;
+//         }
+      }
+   }
+   std::size_t count = coloring.numColors();
+
+   if(inKeptNonNeighbours){
+      coloring[u] = count;
+      coloring[remove1] = count;
+      coloring[v] = count+1;
+      coloring[remove2] = count+1;
+   }else if(inRemoveOneNonNeighbours){
+      coloring[remove1] = coloring[keep];
+      coloring[u] = count;
+      coloring[keep] = count;
+      coloring[v] = count+1;
+      coloring[remove2] = count+1;
+   }else{
+      assert(inRemoveTwoNonNeighbours);
+      coloring[remove2] = coloring[keep];
+      coloring[u] = count;
+      coloring[remove1] = count;
+      coloring[v] = count+1;
+      coloring[keep] = count+1;
+   }
+
+   coloring.setNumColors(count+2);
 }
 }

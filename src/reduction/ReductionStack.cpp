@@ -2,6 +2,8 @@
 // Created by rolf on 5-7-23.
 //
 
+#include <ranges>
+
 #include "pcog/reduction/ReductionStack.hpp"
 namespace pcog {
 void ReductionStack::push(const Reduction& reduction) {
@@ -21,5 +23,25 @@ void ReductionStack::push(const Reduction& reduction) {
 }
 std::size_t ReductionStack::numFixedColors() const {
    return nFixedColors;
+}
+void ReductionStack::transformStableSet(DenseSet &set) const{
+   for(const auto & reduction : reductions){
+      std::visit([&set](const auto &arg) { arg.transformStableSet(set); },
+                 reduction);
+   }
+
+}
+void ReductionStack::clear() {
+   reductions.clear();
+   nFixedColors = 0;
+}
+void ReductionStack::newToOldColoring(NodeColoring &coloring) const {
+   std::size_t i = reductions.size() -1;
+   for(auto it = reductions.rbegin(); it != reductions.rend(); ++it){
+      std::visit([&coloring](const auto& red){
+         red.newToOldColoring(coloring);
+      },*it);
+      --i;
+   }
 }
 }

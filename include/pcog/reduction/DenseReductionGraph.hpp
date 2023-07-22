@@ -7,13 +7,18 @@
 
 #include "pcog/utilities/DenseGraph.hpp"
 namespace pcog {
+struct InducedGraph{
+   DenseGraph graph;
+   NodeMap newToOld;
+   NodeMap oldToNew;
+};
 class DenseReductionGraph {
  public:
    explicit DenseReductionGraph(const DenseGraph& graph);
    void removeNode(Node node);
    void removeStableSet(const DenseSet& set);
    void removeNodeEdges(Node node, const DenseSet& otherNodes);
-   DenseSet complementNeighbourhood(Node node) const;
+   [[nodiscard]] DenseSet complementNeighbourhood(Node node) const;
    [[nodiscard]] const DenseSet& neighbourhood(Node node) const;
    [[nodiscard]] const DenseSet& nodes() const;
    [[nodiscard]] std::size_t numNodes() const;
@@ -21,6 +26,8 @@ class DenseReductionGraph {
    [[nodiscard]] bool setIsStable(const DenseSet& set) const;
    [[nodiscard]] bool setIsStableMaximal(const DenseSet& set) const;
    [[nodiscard]] bool containsNode(Node node) const;
+   [[nodiscard]] InducedGraph currentGraph() const;
+
 
    [[nodiscard]] bool hasLowerBound() const;
    [[nodiscard]] std::size_t lowerBound() const;

@@ -64,7 +64,9 @@ bool foldDegreeTwoReduceNode(Node node, DenseReductionGraph &graph,
    Node keepNode = removeFirst ?  second : first;
    Node removeNode = removeFirst ? first : second;
    const DenseSet& keepRemoveNeighbours = removeFirst ? firstMinSecond : secondMinFirst;
-   stack.push(FoldDegreeTwoReduction(node,keepNode,removeNode));
+   const DenseSet& keepNonNeighbours = removeFirst ? secondNonNeighbours : firstNonNeighbours;
+   const DenseSet& removeNonNeighbours = removeFirst ? firstNonNeighbours : secondNonNeighbours;
+   stack.push(FoldDegreeTwoReduction(node,keepNode,removeNode,keepNonNeighbours,removeNonNeighbours));
    //TODO: what nodes to push to queue? Nodes in keepRemoveNeighbours get smaller degrees w.r.t lower bound
    queue.push(keepNode,graph.lowerBoundNodes().contains(keepNode));
    //TODO: think/test about if more/less nodes need to be pushed to the queue
@@ -79,5 +81,50 @@ bool foldDegreeTwoReduceNode(Node node, DenseReductionGraph &graph,
    graph.removeNodeEdges(keepNode,keepRemoveNeighbours);
 
    return true;
+}
+void FoldDegreeTwoReduction::transformStableSet(DenseSet &set) const {
+   assert(!set.contains(degree2Node));
+   assert(!set.contains(removedNode));
+   if(set.contains(keptNode)){
+      //If set is stable w.r.t removed neighbourhood of the removed node, we change it to be that
+      if(set.isSubsetOf(removeNonNeighbours)){
+         set.remove(keptNode);
+         set.add(removedNode);
+      }else{
+         assert(set.isSubsetOf(keepNonNeighbours));
+      }
+   }
+}
+void FoldDegreeTwoReduction::newToOldColoring(NodeColoring &coloring) const {
+   std::size_t count = coloring.numColors();
+
+   assert(coloring[degree2Node] == INVALID_COLOR);
+   assert(coloring[removedNode] == INVALID_COLOR);
+   assert(coloring[keptNode] != INVALID_COLOR);
+
+   Color keptNodeColor = coloring[keptNode];
+
+   assert(keptNodeColor != INVALID_COLOR);
+
+   bool inRemoveNonNeighbours = true;
+   for(std::size_t i = 0; i < coloring.numNodes(); ++i){
+      if(i == keptNode) continue;
+      if(keptNodeColor == coloring[i] && !removeNonNeighbours.contains(i)){
+         inRemoveNonNeighbours = false;
+         break;
+      }
+   }
+
+   coloring[degree2Node] = count;
+   if(!inRemoveNonNeighbours){
+      coloring[removedNode] = count;
+   }else{
+      coloring[removedNode] = coloring[keptNode];
+      coloring[keptNode] = count;
+   }
+
+   ++count;
+   coloring.setNumColors(count);
+   //TODO?
 }
 }

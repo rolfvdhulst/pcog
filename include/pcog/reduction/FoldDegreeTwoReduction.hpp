@@ -5,19 +5,31 @@
 #ifndef PCOG_SRC_REDUCTION_FOLDDEGREETWOREDUCTION_HPP
 #define PCOG_SRC_REDUCTION_FOLDDEGREETWOREDUCTION_HPP
 
+#include <utility>
+
 #include "DenseReductionGraph.hpp"
 #include "ReductionVertexQueue.hpp"
+#include "pcog/utilities/Coloring.hpp"
 
 namespace pcog {
 class ReductionStack;
 ///This reduction handles some nodes which have degree 2 in the complement graph,
 /// e.g. which only have two non-neighbours in the current graph
 struct FoldDegreeTwoReduction {
-   FoldDegreeTwoReduction(Node node, Node kept, Node removed)
-       : degree2Node{node}, keptNode{kept}, removedNode{removed}{};
+   FoldDegreeTwoReduction(Node node, Node kept, Node removed,
+                          DenseSet keepNonNeighbours, DenseSet removeNonNeighbours)
+       : degree2Node{node}, keptNode{kept}, removedNode{removed},
+         keepNonNeighbours{std::move(keepNonNeighbours)}, removeNonNeighbours{std::move(removeNonNeighbours)}
+         {};
    Node degree2Node;
    Node keptNode;
    Node removedNode;
+
+   DenseSet keepNonNeighbours;
+   DenseSet removeNonNeighbours;
+
+   void transformStableSet(DenseSet& set) const;
+   void newToOldColoring(NodeColoring &coloring) const;
 };
 
 bool foldDegreeTwoReduceNode(Node node,

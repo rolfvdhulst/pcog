@@ -6,91 +6,6 @@
 #include "pcog/utilities/DenseSet.hpp"
 #include "pcog/reduction/ReductionStack.hpp"
 
-//branch_and_reduce_algorithm::branch_and_reduce_algorithm(vector<vector<int>> _adj, int const _N)
-//    : adj()
-//      , n(_adj.size())
-//      , used(n*2)
-//{
-//
-//   n = _adj.size();
-//   adj.swap(_adj);
-//
-//   N = _N;
-//
-//   x.resize(N, 0);
-//   for (int i = 0; i < n; i++) x[i] = -1;
-//
-//   in.resize(n, -1);
-//   out.resize(n, -1);
-//
-//   que.resize(n * 2, 0);
-//   level.resize(n * 2, 0);
-//   ////    cout << "level.size=" << level.size() << endl << flush;
-//   iter.resize(n * 2, 0);
-//
-//   ////    packing.reserve(N);
-//}
-//
-//void branch_and_reduce_algorithm::updateLP() {
-//   for (int v = 0; v < n; v++) if (out[v] >= 0 && ((x[v] < 0) ^ (x[out[v]] < 0))) {
-//         in[out[v]] = -1;
-//         out[v] = -1;
-//      }
-//   for (;;) {
-//      used.clear();
-//      int qs = 0, qt = 0;
-//      for (int v = 0; v < n; v++) if (x[v] < 0 && out[v] < 0) {
-//            level[v] = 0;
-//            used.add(v);
-//            que[qt++] = v;
-//         }
-//      bool ok = false;
-//      while (qs < qt) {
-//         int v = que[qs++];
-//         iter[v] = adj[v].size() - 1;
-//         for (int u : adj[v]) if (x[u] < 0 && used.add(n + u)) {
-//               int w = in[u];
-//               if (w < 0) ok = true;
-//               else {
-//                  level[w] = level[v] + 1;
-//                  used.add(w);
-//                  que[qt++] = w;
-//               }
-//            }
-//      }
-//      if (!ok) break;
-//      for (int v = n - 1; v >= 0; v--) if (x[v] < 0 && out[v] < 0) {
-//            dinicDFS(v);
-//         }
-//   }
-//}
-//
-//// helper for lpReduction
-//bool branch_and_reduce_algorithm::dinicDFS(int v) {
-//   while (iter[v] >= 0) {
-//      int u = adj[v][iter[v]--], w = in[u];
-//      if (x[u] >= 0) continue;
-//      if (w < 0 || (level[v] < level[w] && iter[w] >= 0 && dinicDFS(w))) {
-//         in[u] = v;
-//         out[v] = u;
-//         return true;
-//      }
-//   }
-//   return false;
-//}
-//
-//
-//void branch_and_reduce_algorithm::set(int v, int a)
-//{
-//   assert(x[v] < 0);
-//   x[v] = a;
-//   if (a == 0) {
-//      for (int u : adj[v]) if (x[u] < 0) {
-//            x[u] = 1;
-//         }
-//   }
-//}
-
 
 namespace pcog {
 
@@ -282,5 +197,19 @@ bool findCrownReductions(DenseReductionGraph& graph,
       queue.push(node,graph.lowerBoundNodes().contains(node));
    }
    return true;
+}
+void CrownReduction::transformStableSet(DenseSet &) const {
+   //no-op, since the fixed sets are removed
+}
+void CrownReduction::newToOldColoring(NodeColoring &coloring) const {
+   std::size_t count = coloring.numColors();
+   for(const auto& set : fixedSets){
+      for(Node node : set){
+         assert(coloring[node] == INVALID_COLOR);
+         coloring[node] = count;
+      }
+      ++count;
+   }
+   coloring.setNumColors(count);
 }
 }

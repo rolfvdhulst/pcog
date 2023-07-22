@@ -40,5 +40,18 @@ bool simplicialReduceNode(Node node,
    return true;
 }
 SimplicialReduction::SimplicialReduction(Node node, DenseSet set) : node{node}, set{set}{}
+void SimplicialReduction::transformStableSet(DenseSet &) const {
+   //no-op, removed
+}
+void SimplicialReduction::newToOldColoring(NodeColoring &coloring) const {
+   std::size_t count = coloring.numColors();
+   for (Node fixed : set) {
+      assert(coloring[fixed] == INVALID_COLOR);
+      coloring[fixed] = count;
+   }
+   ++count;
+
+   coloring.setNumColors(count);
+}
 
 }

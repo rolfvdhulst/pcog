@@ -9,9 +9,14 @@
 #include "ReductionVertexQueue.hpp"
 #include "DenseReductionGraph.hpp"
 namespace pcog{
+struct ReductionResult{
+   InducedGraph graph;
+   ReductionStack stack;
+   DenseSet lowerBoundClique;
+};
 
 DenseSet greedyClique(const DenseReductionGraph& t_graph);
-void reduceGraph(const DenseGraph& graph);
+ReductionResult reduceGraph(const DenseGraph& graph);
 }
 
 #endif // PCOG_INCLUDE_PCOG_REDUCTION_REDUCER_HPP

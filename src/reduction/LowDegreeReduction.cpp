@@ -37,4 +37,21 @@ bool lowDegreeReduceNode(Node node,
    return true;
 }
 
+void LowDegreeReduction::transformStableSet(DenseSet &set) const {
+   assert(!set.contains(node));
+   if(!set.intersects(neighbours)){
+      set.add(node);
+   }
+}
+void LowDegreeReduction::newToOldColoring(NodeColoring &coloring) const {
+   DenseSet unusedColors(coloring.numColors(),true);
+   for(Node neighbour : neighbours){
+      assert(coloring[neighbour] != INVALID_NODE);
+      unusedColors.remove(coloring[neighbour]);
+   }
+   Color nodeColor = unusedColors.first();
+   assert(nodeColor != INVALID_NODE);
+   coloring[node] = nodeColor;
+
+}
 }

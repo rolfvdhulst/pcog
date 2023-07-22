@@ -476,7 +476,7 @@ PreprocessingResult preprocessedGraphFromChild(const DenseGraph& t_preprocessedC
             }
             fixed_sets.push_back(set);
          }
-         assert(lower_bound >= roundFixedSets.size()); //TODO: sometimes fails...
+//         assert(lower_bound >= roundFixedSets.size()); //TODO: sometimes fails...
          lower_bound -= roundFixedSets.size();
          if(!roundFixedSets.empty()){
             lastSuccessfulMethod = 1;

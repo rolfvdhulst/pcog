@@ -9,6 +9,15 @@ namespace pcog{
 DominatedReduction::DominatedReduction(Node node, Node dominatingNode) : node{node},dominatedBy{dominatingNode}{
 
 }
+void DominatedReduction::transformStableSet(DenseSet &set) const {
+   assert(!set.contains(node));
+   set.set(node,set.contains(dominatedBy));
+}
+void DominatedReduction::newToOldColoring(NodeColoring &coloring) const {
+   assert(coloring[dominatedBy] != INVALID_COLOR);
+   assert(coloring[node] == INVALID_COLOR);
+   coloring[node] = coloring[dominatedBy];
+}
 
 //This function is faster for very dense graphs e.g. graphs where we are effectively
 //solving the vertex clique cover on the sparse complement graph
