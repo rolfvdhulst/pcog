@@ -44,4 +44,7 @@ void ReductionStack::newToOldColoring(NodeColoring &coloring) const {
       --i;
    }
 }
+const std::vector<Reduction> &ReductionStack::reductionStack() const {
+   return reductions;
+}
 }

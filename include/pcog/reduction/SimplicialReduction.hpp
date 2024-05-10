@@ -19,6 +19,9 @@ struct SimplicialReduction {
    void newToOldColoring(NodeColoring &coloring) const;
 };
 
+//If a node is contained in a unique maximum stable set, we can fix this color
+//and remove the stable set from the graph. For a given node v, we check this by
+//checking if V \ N(v) is a stable set.
 bool simplicialReduceNode(Node node,
                          DenseReductionGraph& graph,
                          ReductionStack& stack,

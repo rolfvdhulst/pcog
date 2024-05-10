@@ -62,33 +62,33 @@ ReductionResult reduceGraph(const DenseGraph& graph){
          }
 
          if(simplicialReduceNode(node,redGraph,result,queue)){
-            std::cout<<"Fixed set!\n";
+//            std::cout<<"Fixed set!\n";
             continue;
          }
          else if(lowDegreeReduceNode(node,redGraph,result,queue)){
-            std::cout<<"Low degree!\n";
+//            std::cout<<"Low degree!\n";
             continue;
          }
          else if(foldDegreeTwoReduceNode(node,redGraph,result,queue)){
-            std::cout<<"Degree two reduced!\n";
+//            std::cout<<"Degree two reduced!\n";
             continue;
          }
          else if(twinDegreeThreeReduction(node,redGraph,result,queue)){
-            std::cout<<"Twin degree 3 reduced!\n";
+//            std::cout<<"Twin degree 3 reduced!\n";
             continue;
          }
          else if(dominatedReduceNode(node,redGraph,result,queue)){
-            std::cout<<"Dominated!\n";
+//            std::cout<<"Dominated!\n";
             continue;
          }
 
       }
       if(findCrownReductions(redGraph,result,queue)){
-         std::cout<<"Crown reductions performed!\n";
+//         std::cout<<"Crown reductions performed!\n";
          continue;
       }
       else if(findTwoFixings(redGraph,result,queue)){
-         std::cout << "Double fixing applied!\n";
+//         std::cout << "Double fixing applied!\n";
          continue;
       }
    }

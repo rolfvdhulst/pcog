@@ -25,6 +25,7 @@ class ReductionStack {
    void transformStableSet(DenseSet& set) const;
    void clear();
    void newToOldColoring(NodeColoring& oldColoring) const;
+   [[nodiscard]] const std::vector<Reduction>& reductionStack() const;
  private:
    std::vector<Reduction> reductions;
    std::size_t nFixedColors = 0;

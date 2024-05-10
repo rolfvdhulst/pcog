@@ -266,6 +266,75 @@ void SolutionData::doPresolve() {
 
    std::cout<<"Original graph has " <<m_originalGraph.numNodes()<<" nodes, density: "<< m_originalGraph.density()*100.0<<"%\n";
    auto result = reduceGraph(m_originalGraph);
+   {
+      std::size_t nSimplicial = 0;
+      std::size_t nSimplicialNodes = 0;
+      std::size_t nLowDegree = 0;
+      std::size_t nDominated = 0;
+      std::size_t nFoldDegreeTwo = 0;
+      std::size_t nTwinDegreeThree = 0;
+      std::size_t nTwinDegreeThreeNodes = 0;
+      std::size_t nTwinDegreeThreeFold = 0;
+      std::size_t nCrown = 0;
+      std::size_t nCrownNodes = 0;
+      std::size_t nCrownColors = 0;
+      std::size_t nTwoFixing = 0;
+      std::size_t nTwoFixingNodes = 0;
+
+      //TODO: record this data during presolve itself rather than going through the stack here
+      for(const auto& reduction : result.stack.reductionStack()) {
+         if(std::holds_alternative<LowDegreeReduction>(reduction)) {
+            nLowDegree += 1;
+         }
+         else if(std::holds_alternative<DominatedReduction>(reduction)) {
+            nDominated += 1;
+         }
+         else if(std::holds_alternative<SimplicialReduction>(reduction)){
+            nSimplicial += 1;
+            auto reduc = std::get<SimplicialReduction>(reduction);
+            nSimplicialNodes += reduc.set.size();
+         }
+         else if(std::holds_alternative<FoldDegreeTwoReduction>(reduction)){
+            nFoldDegreeTwo += 1;
+         }
+         else if(std::holds_alternative<TwinDegreeThreeReduction>(reduction)){
+            nTwinDegreeThree += 1;
+            auto reduc = std::get<TwinDegreeThreeReduction>(reduction);
+            nTwinDegreeThreeNodes += reduc.uSet.size();
+            nTwinDegreeThreeNodes += reduc.vSet.size();
+         }
+         else if(std::holds_alternative<TwinDegreeThreeFoldReduction>(reduction)) {
+            nTwinDegreeThreeFold += 1;
+         }
+         else if(std::holds_alternative<CrownReduction>(reduction)){
+            nCrown += 1;
+            const auto& crownReduction = std::get<CrownReduction>(reduction);
+            nCrownColors += crownReduction.fixedSets.size();
+            for(const auto& set : crownReduction.fixedSets) {
+               nCrownNodes += set.size();
+            }
+         }else if(std::holds_alternative<TwoFixingReduction>(reduction)){
+            nTwoFixing += 2;
+
+            const auto& reduc = std::get<TwoFixingReduction>(reduction);
+            nTwoFixingNodes += reduc.firstSet.size();
+            nTwoFixingNodes += reduc.secondSet.size();
+         }
+      }
+      std::cout << "Type          | Reductions | removed nodes | fixed colors\n";
+      std::cout << "Low degree    | "<<std::setw(10) << nLowDegree <<" | "<< std::setw(13) << nLowDegree << " |            0\n";
+      std::cout << "Dominated     | "<<std::setw(10) << nDominated <<" | "<< std::setw(13) << nDominated << " |            0\n";
+      std::cout << "Simplicial    | "<<std::setw(10) << nSimplicial <<" | "<< std::setw(13) <<nSimplicialNodes<<" | "<< std::setw(12)<< nSimplicial<<"\n";
+      std::cout << "2-folding     | "<<std::setw(10) << nFoldDegreeTwo <<" | "<< std::setw(13) <<2*nFoldDegreeTwo<<" | "<< std::setw(12)<< nFoldDegreeTwo<<"\n";
+      std::cout << "Twin degree 3 | "<<std::setw(10) << nTwinDegreeThree <<" | "<< std::setw(13) << nTwinDegreeThreeNodes <<" | "<< std::setw(12)<< 2*nTwinDegreeThree<<"\n";
+      std::cout << "Twin 3-folding| "<<std::setw(10) << nTwinDegreeThreeFold <<" | "<< std::setw(13) <<4*nTwinDegreeThreeFold << " |            0\n";
+      std::cout << "Crown         | "<<std::setw(10) << nCrown <<" | "<< std::setw(13) <<nCrownNodes << " | "<< std::setw(12) << nCrownColors << "\n";
+      std::cout << "2-fixing      | "<<std::setw(10) << nTwoFixing <<" | "<<std::setw(13) << nTwoFixingNodes <<" | "<<std::setw(12) << 2*nTwoFixing << "\n";
+
+      using Reduction = std::variant<LowDegreeReduction,DominatedReduction,SimplicialReduction,
+                                     FoldDegreeTwoReduction,TwinDegreeThreeReduction,TwinDegreeThreeFoldReduction,CrownReduction,
+                                     TwoFixingReduction>;
+   }
    std::cout<<"Presolved graph has "<<result.graph.graph.numNodes()<<" nodes, density: "<< result.graph.graph.density()*100.0<<"%\n";
 
    m_preprocessedGraph = result.graph.graph;
