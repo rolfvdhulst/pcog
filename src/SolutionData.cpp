@@ -344,6 +344,13 @@ void SolutionData::doPresolve() {
    std::size_t lb = result.lowerBoundClique.size();
    assert(m_preprocessedGraph.setIsClique(result.lowerBoundClique));
 
+   if(result.graph.graph.numNodes() == 0) {
+      //Preprocessing solved the graph, so the preprocessed-graph is zero-colorable
+      //We add a solution, so that our solver is aware of this fact.
+      std::vector<std::size_t> colors = {};
+      addSolutionPresolve(colors);
+      return;
+   }
 
    //Project coloring to preprocessed graph
    SetColoring projectedColoring;

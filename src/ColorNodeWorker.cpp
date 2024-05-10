@@ -6,10 +6,10 @@
 #include "pcog/Branching.hpp"
 #include "pcog/BranchingSelection.hpp"
 #include "pcog/ColorSolver.hpp"
+#include "pcog/SolutionData.hpp"
 #include "pcog/TabuColoring.hpp"
 #include "pcog/mwss/AugmentingSearch.hpp"
 #include "pcog/mwss/CombinatorialStableSet.hpp"
-#include "pcog/SolutionData.hpp"
 #include <thread>
 
 namespace pcog {
@@ -18,6 +18,11 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData, std::
    setupNode(t_node,t_solData,stop);
    if(m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)){
       cleanUpOnCancel(t_node,t_solData,stop);
+      return;
+   }
+   //It could be the case that node preprocessing solved the problem. In this case, we don't need to solve the LP
+   if(t_node.status() == BBNodeStatus::CUT_OFF){
+
       return;
    }
    // Solve lp
@@ -905,7 +910,8 @@ void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node) {
 void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_bool& stop) {
    bool isChildNode = node.parent() == m_focusNode;
    if(node.depth() == 0){
-      // For the root node; simply copy
+      // For the root node; simply copy.
+      // We already presolved the root node graph before the setup, so we do not need to do this again
       m_completeFocusGraph = solver.preprocessedGraph();
       m_focusGraph = solver.preprocessedGraph();
       m_mapToPreprocessed =
@@ -933,16 +939,36 @@ void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_
       m_focusGraph = result.graph;
       m_mapToPreprocessed.extend(result.map);
 
-      if(m_mapToPreprocessed.newToOldIDs.size() == 0){
-         std::cout<<"Empty after preprocessing!\n";
+      if(m_mapToPreprocessed.newToOldIDs.size() == 0) {
+         node.updateLowerBound(m_mapToPreprocessed.fixed_sets.size());
+         node.setStatus(BBNodeStatus::CUT_OFF);
+         if(m_mapToPreprocessed.fixed_sets.size() < solver.upperBoundUnscaled()){
+            NodeColoring coloring(0);
+            NodeColoring newColoring = extendColoring(
+                coloring, m_mapToPreprocessed, m_completeFocusGraph);
+
+            SetColoring fixedColoring(newColoring);
+            assert(fixedColoring.isValid(m_completeFocusGraph));
+            std::vector<DenseSet> colors = fixedColoring.colors();
+            for (auto &color : colors) {
+               maximizeStableSet(color, m_completeFocusGraph);
+            }
+            std::vector<std::size_t> colorIndices;
+            for (const auto &set : colors) {
+               std::size_t index = m_localData.findOrAddStableSet(set);
+               colorIndices.push_back(index);
+            }
+            addSolution(colorIndices,node,solver,true,stop);
+            solver.writeLocalVarsToGlobal(m_localData,stop);
+         }
+         return;
       }
       //TODO: check if preprocessing found new optimal solution, and terminate if preprocessing removed the graph
       solver.writeLocalVarsToGlobal(m_localData,stop);
       setupChildLP(node,solver,result.map);
    }
    else{
-      // When not a child node, we do not bother with a scheme to attempt to 'rollback' changes;
-      // this is likely to be more pain than it is worth
+      // When not a child node, we initialize the data structures from scratch again
 
       // Perform node preprocessing
       auto [completeGraph, result] =
@@ -951,8 +977,29 @@ void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_
       m_completeFocusGraph = completeGraph;
       m_focusGraph = result.graph;
       m_mapToPreprocessed = result.map;
-      if(m_mapToPreprocessed.newToOldIDs.size() == 0){
-         std::cout<<"Empty after preprocessing!\n";
+      if(m_mapToPreprocessed.newToOldIDs.size() == 0) {
+         node.updateLowerBound(m_mapToPreprocessed.fixed_sets.size());
+         node.setStatus(BBNodeStatus::CUT_OFF);
+         if(m_mapToPreprocessed.fixed_sets.size() < solver.upperBoundUnscaled()){
+            NodeColoring coloring(0);
+            NodeColoring newColoring = extendColoring(
+                coloring, m_mapToPreprocessed, m_completeFocusGraph);
+
+            SetColoring fixedColoring(newColoring);
+            assert(fixedColoring.isValid(m_completeFocusGraph));
+            std::vector<DenseSet> colors = fixedColoring.colors();
+            for (auto &color : colors) {
+               maximizeStableSet(color, m_completeFocusGraph);
+            }
+            std::vector<std::size_t> colorIndices;
+            for (const auto &set : colors) {
+               std::size_t index = m_localData.findOrAddStableSet(set);
+               colorIndices.push_back(index);
+            }
+            addSolution(colorIndices,node,solver,true,stop);
+            solver.writeLocalVarsToGlobal(m_localData,stop);
+         }
+         return;
       }
       //TODO: check if preprocessing found new optimal solution, and terminate if preprocessing removed the graph
       solver.syncLocalVarsWithGlobal(m_localData);

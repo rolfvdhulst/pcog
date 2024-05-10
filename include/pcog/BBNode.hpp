@@ -13,7 +13,7 @@
 namespace pcog {
 enum class BBNodeStatus {
    INITIALIZED,
-   PROCESSING,
+   PROCESSING, //TODO: unused, do we remove?
    BRANCHED, // Node was solved, and branching was performed
    CUT_OFF,  // Node was cut off e.g. the lower bound was greater than the upper
 };
