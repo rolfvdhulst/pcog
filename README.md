@@ -50,4 +50,5 @@ Usage:
 
 `pcog [inputfile] [option [value]]`
 
-where `[inputfile]` is the path to the instance. The options and all their possible values can be listed using `pcog -h`.
+where `[inputfile]` is the path to the instance. The options and all their possible values can be listed using:
+`pcog -h`.
