@@ -15,7 +15,6 @@ bool simplicialReduceNode(Node node,
    set.complement();
    set.inplaceIntersection(graph.nodes());
 
-   bool setIsStable = true;
    DenseSet disallowed_nodes(set.capacity());
    for(const auto& setNode : set){
       if(disallowed_nodes.contains(setNode)){
@@ -26,7 +25,6 @@ bool simplicialReduceNode(Node node,
       //however, we only check for nodes within the present set of nodes, so this is fine anyways
       disallowed_nodes.inplaceUnion(graph.neighbourhood(setNode));
    }
-   assert(setIsStable);
    SimplicialReduction reduction(node,set);
    stack.push(reduction);
 
@@ -39,7 +37,7 @@ bool simplicialReduceNode(Node node,
    graph.removeStableSet(set);
    return true;
 }
-SimplicialReduction::SimplicialReduction(Node node, DenseSet set) : node{node}, set{set}{}
+SimplicialReduction::SimplicialReduction(Node t_node, DenseSet t_set) : node{t_node}, set{t_set}{}
 void SimplicialReduction::transformStableSet(DenseSet &) const {
    //no-op, removed
 }

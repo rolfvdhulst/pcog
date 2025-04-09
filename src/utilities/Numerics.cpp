@@ -14,7 +14,7 @@ SafeWeight toSafeWeightUpperbound(double value, double scale){
 
    fesetround(FE_UPWARD);
    double result = value * scale;
-   SafeWeight weight = std::ceil(result);
+   SafeWeight weight = static_cast<SafeWeight>(std::ceil(result)+0.1);
 
    fesetround(mode);
    return weight;
@@ -36,7 +36,7 @@ toSafeWeights(const std::vector<double> &t_weights) {
    std::vector<SafeWeight> safeWeights(t_weights.size());
    for (std::size_t i = 0; i < t_weights.size(); ++i) {
       double result = t_weights[i] * scale;
-      SafeWeight weight = std::floor(result); //TODO: check if this cast is okay or not/dive into the stdlib or use Boost.NumericConversion
+      SafeWeight weight = static_cast<SafeWeight>(std::floor(result)+0.1); //TODO: check if this cast is okay or not/dive into the stdlib or use Boost.NumericConversion
       safeWeights[i] = weight;
    }
    fesetround(mode); //reset the rounding mode again

@@ -35,7 +35,7 @@ std::optional<NodeColoring> TabuColoring::run(NodeColoring initialColoring) {
 
       Node bestNode = INVALID_NODE;
       std::size_t best_color = -1;
-      std::size_t num_critical = 0;
+      int num_critical = 0;
       long min_value = graph.numNodes() * graph.numNodes();
 
       for (Node node = 0; node < graph.numNodes(); ++node) {
@@ -88,7 +88,7 @@ std::optional<NodeColoring> TabuColoring::run(NodeColoring initialColoring) {
          break;
       }
       /*update tabu list*/
-      std::size_t forbidden_iterations = tabu_base + num_critical * tabu_gamma;
+      std::size_t forbidden_iterations = tabu_base + static_cast<std::size_t>(std::llround(num_critical * tabu_gamma));
       tabu_list[bestNode][oldColor] = iter + forbidden_iterations;
 
       for (const Node &node : graph.neighbourhood(bestNode)) {
@@ -120,7 +120,7 @@ long TabuColoring::numViolatedEdges(const DenseGraph &graph,
    return numViolated;
 }
 
-TabuColoring::TabuColoring(const DenseGraph &graph) : graph{graph} {}
+TabuColoring::TabuColoring(const DenseGraph &t_graph) : graph{t_graph} {}
 
 std::size_t TabuColoring::numIterations() const { return done_iterations; }
 void TabuColoring::setMaxIterations(std::size_t iters) {

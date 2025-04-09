@@ -13,8 +13,8 @@ enum class BranchType { DIFFER, SAME, ROOT };
 ///Struct which contains the two branching nodes and the type of branch
 struct BranchData {
    BranchData() = default;
-   BranchData(Node first, Node second, BranchType type)
-       : first{first}, second{second}, type{type} {};
+   BranchData(Node first_, Node second_, BranchType type_)
+       : first{first_}, second{second_}, type{type_} {};
    Node first = INVALID_NODE;
    Node second = INVALID_NODE;
    BranchType type = BranchType::ROOT;

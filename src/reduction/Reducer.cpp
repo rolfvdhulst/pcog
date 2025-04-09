@@ -55,6 +55,7 @@ ReductionResult reduceGraph(const DenseGraph& graph){
    ReductionStack result;
    ReductionVertexQueue queue(clique);
    while(!queue.empty()){
+      //We run 'fast' reductions until we cannot find them anymore.
       while(!queue.empty()){
          Node node = queue.pop();
          if(!redGraph.containsNode(node)){

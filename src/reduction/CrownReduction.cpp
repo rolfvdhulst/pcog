@@ -22,8 +22,8 @@ bool coverDfs(std::size_t v,
       if (x[u] >= 0) continue;
       int w = in[u];
       if (w < 0 || (level[v] < level[w] && iter[w] >= 0 && coverDfs(w,adj,x,level,iter,in,out))) {
-         in[u] = v;
-         out[v] = u;
+         in[u] = static_cast<int>(v);
+         out[v] = static_cast<int>(u);
          return true;
       }
    }
@@ -83,7 +83,7 @@ std::vector<std::vector<std::size_t>> findCrownCliques(std::size_t n,
       bool ok = false;
       while (qs < qt) {
          std::size_t v = queue[qs++];
-         iter[v] = adj[v].size() - 1;
+         iter[v] = static_cast<int>(adj[v].size()) - 1;
          for (std::size_t u : adj[v]){
             if(x[u] >= 0) continue;
             if(used.contains(n+u)) continue;
@@ -99,7 +99,7 @@ std::vector<std::vector<std::size_t>> findCrownCliques(std::size_t n,
          }
       }
       if (!ok) break;
-      for (int v = n - 1; v >= 0; v--) {
+      for (int v = static_cast<int>(n - 1); v >= 0; v--) {
          if (x[v] < 0 && out[v] < 0) {
             coverDfs(v,adj,x,level,iter,in,out);
          }

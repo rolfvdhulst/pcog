@@ -17,9 +17,9 @@ class ReductionStack;
 /// e.g. which only have two non-neighbours in the current graph
 struct FoldDegreeTwoReduction {
    FoldDegreeTwoReduction(Node node, Node kept, Node removed,
-                          DenseSet keepNonNeighbours, DenseSet removeNonNeighbours)
+                          DenseSet t_keepNonNeighbours, DenseSet t_removeNonNeighbours)
        : degree2Node{node}, keptNode{kept}, removedNode{removed},
-         keepNonNeighbours{std::move(keepNonNeighbours)}, removeNonNeighbours{std::move(removeNonNeighbours)}
+         keepNonNeighbours{std::move(t_keepNonNeighbours)}, removeNonNeighbours{std::move(t_removeNonNeighbours)}
          {};
    Node degree2Node;
    Node keptNode;

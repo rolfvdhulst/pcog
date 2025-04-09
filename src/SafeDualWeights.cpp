@@ -50,7 +50,7 @@ SafeDualWeights::weight_type
 SafeDualWeights::setCostUpperBound(const DenseSet &set) const {
    // Every double value can be just below the safe value n+1
    // so adding these doubles we need to add 1 for every element of the set = set.size()
-   return setCost(set) + set.size();
+   return setCost(set) + static_cast<SafeDualWeights::weight_type>(set.size());
 }
 
 SafeDualWeights::weight_type

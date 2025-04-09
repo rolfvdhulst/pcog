@@ -83,8 +83,12 @@ LPSolverStatus LPSolver::solve(volatile bool * interrupt) {
 RowVector LPSolver::getDualSolution() {
    assert(m_soplex.status() == SPxSolver::OPTIMAL);
    DVector spxVector(m_soplex.numRows());
+#ifndef NDEBUG
    bool result = m_soplex.getDual(spxVector);
    assert(result);
+#else
+   m_soplex.getDual(spxVector);
+#endif
    RowVector rowVector(spxVector.dim());
    for (int i = 0; i < spxVector.dim(); ++i) {
       rowVector[i].column = i;

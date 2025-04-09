@@ -273,7 +273,7 @@ bool MaxWeightStableSetCombinatorial<F>::isPruned(
 template <WeightFunction F>
 void MaxWeightStableSetCombinatorial<F>::selectBranchingNodes(
     SparseSet &branch_nodes, const DenseSet &excluded_nodes,
-    const DenseSet &free_nodes, const DenseSet &currentNodes) {
+    const DenseSet &free_nodes, const DenseSet &/*currentNodes*/) {
 
    assert(!branch_nodes.empty());
    // Look for nodes which have a weight >= than their entire free
@@ -448,8 +448,8 @@ MaxWeightStableSetCombinatorial<F>::clique_covering_heuristic_held(
 
 template <WeightFunction F>
 MaxWeightStableSetCombinatorial<F>::MaxWeightStableSetCombinatorial(
-    F function, const DenseGraph &graph)
-    : graph{graph}, weightFunction{function} {
+    F function, const DenseGraph &graph_)
+    : graph{graph_}, weightFunction{function} {
    memory_stack.reserve(graph.numNodes());
    for (std::size_t i = 0; i < graph.numNodes(); ++i) {
       memory_stack.emplace_back(BranchData(graph.numNodes()));

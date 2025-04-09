@@ -9,15 +9,15 @@
 
 
 namespace pcog {
-PreprocessingResult::PreprocessingResult(DenseGraph graph, PreprocessedMap map)
-    : graph{std::move(graph)}, map{std::move(map)} {}
+PreprocessingResult::PreprocessingResult(DenseGraph graph_, PreprocessedMap map_)
+    : graph{std::move(graph_)}, map{std::move(map_)} {}
 
 DenseSet findInitialClique(const DenseGraph& t_graph){
    DenseSet data;
 
-   auto mss_callback = [](const DenseSet& current_nodes, MaxStableSetCombinatorial::weight_type total_weight, void * user_data, bool first_solution, bool& stop_solving, bool& accepted_solution){
-      auto * data = static_cast<DenseSet *>(user_data);
-      *data = current_nodes;
+   auto mss_callback = [](const DenseSet& current_nodes, MaxStableSetCombinatorial::weight_type /*total_weight*/, void * user_data, bool /*first_solution*/, bool& stop_solving, bool& accepted_solution){
+      auto* pdata = static_cast<DenseSet *>(user_data);
+      *pdata = current_nodes;
       accepted_solution = true;
       stop_solving = false;
    };
@@ -285,10 +285,10 @@ PreprocessedReason PreprocessedNode::removedReason() const { return m_reason; }
 
 Node PreprocessedNode::dominatingNode() const { return m_dominated_by; }
 
-PreprocessedMap::PreprocessedMap(std::vector<PreprocessedNode> removed_nodes,
+PreprocessedMap::PreprocessedMap(std::vector<PreprocessedNode> t_removed_nodes,
                                  std::vector<DenseSet> t_fixedSets,
                                  NodeMap newToOld, NodeMap oldToNew)
-    : removed_nodes{std::move(removed_nodes)},
+    : removed_nodes{std::move(t_removed_nodes)},
       fixed_sets{std::move(t_fixedSets)},
       newToOldIDs{std::move(newToOld)},
       oldToNewIDs{std::move(oldToNew)} {}

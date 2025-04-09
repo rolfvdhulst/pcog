@@ -94,6 +94,9 @@ std::optional<DenseGraph> DimacsFileHeader::ReadAsDense() {
             std::size_t v1 = std::stoul(substring, &index) -1;
             auto smallerSubstring = substring.substr(index);
             std::size_t v2 = std::stoul(smallerSubstring, &index) -1;
+//            if(graph.isEdge(v1,v2)){
+//               std::cout<<"Duplicate edge: "<<v1<<"-"<<v2<<"\n";
+//            }
             graph.addEdge(v1, v2);
          } catch (std::invalid_argument &error) {
             return std::nullopt;

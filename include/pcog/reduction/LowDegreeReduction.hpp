@@ -11,7 +11,7 @@
 namespace pcog {
 class ReductionStack;
 struct LowDegreeReduction {
-   LowDegreeReduction(Node node, DenseSet neighbours) : node{node},neighbours{std::move(neighbours)}{};
+   LowDegreeReduction(Node t_node, DenseSet t_neighbours) : node{t_node}, neighbours{std::move(t_neighbours)}{};
    Node node;
    DenseSet neighbours;
 

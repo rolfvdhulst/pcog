@@ -9,9 +9,9 @@
 #include <numeric>
 
 namespace pcog{
-AugmentingSearch::AugmentingSearch(const std::vector<SafeWeight> &greedyWeights, const DenseGraph &graph) :
-                                                                                                                graph{graph}{
-   std::size_t num_nodes = graph.numNodes();
+AugmentingSearch::AugmentingSearch(const std::vector<SafeWeight> &greedyWeights, const DenseGraph &t_graph) :
+                                                                                                                graph{t_graph}{
+   std::size_t num_nodes = t_graph.numNodes();
    assert(greedyWeights.size() == num_nodes);
    table.resize(num_nodes);
    for (std::size_t i = 0; i < num_nodes; ++i) {
@@ -21,7 +21,7 @@ AugmentingSearch::AugmentingSearch(const std::vector<SafeWeight> &greedyWeights,
    }
    num_solution_nodes = 0;
    num_free_nodes = num_nodes;
-   temporary_set = SparseSet(graph.numNodes());
+   temporary_set = SparseSet(t_graph.numNodes());
 }
 
 void AugmentingSearch::addNodeToSolution(Node node) {
@@ -332,7 +332,7 @@ std::size_t AugmentingSearch::greedyByWeight(long rotateOrderBy) {
 
 
 
-std::size_t AugmentingSearch::greedyByDynamicSurplus(long rotateOrderBy) {
+std::size_t AugmentingSearch::greedyByDynamicSurplus(long /*rotateOrderBy*/) {
 
    //O(n^2), slow. Heap usage could lead to, but this is a pain to implement
    //as one needs to continuously update it when picking vertices

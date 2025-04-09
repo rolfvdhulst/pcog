@@ -22,7 +22,6 @@ void ColorNodeWorker::processNode(BBNode &t_node, SolutionData &t_solData, std::
    }
    //It could be the case that node preprocessing solved the problem. In this case, we don't need to solve the LP
    if(t_node.status() == BBNodeStatus::CUT_OFF){
-
       return;
    }
    // Solve lp
@@ -129,8 +128,8 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node) {
 
    DenseSet computedSet(m_focusGraph.numNodes());
 
-   auto lambda = [](const DenseSet &current_nodes, std::size_t size,
-                    void *user_data, bool first_solution, bool &stop_solving,
+   auto lambda = [](const DenseSet &current_nodes, std::size_t /*size*/,
+                    void *user_data, bool /*first_solution*/, bool &stop_solving,
                     bool &accepted_solution) {
       auto *set = reinterpret_cast<DenseSet *>(user_data);
       *set = current_nodes;
@@ -203,6 +202,10 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
       }
 
       ++numRounds;
+      if(numRounds % 100 == 0 && t_solData.numProcessedNodes() < 2){
+         synchronizeStastistics(node,t_solData,stop);
+         t_solData.display(std::cout);
+      }
    }
    if(!duringDiving){
       node.setBasis(toSmallBasis(m_lpSolver.getLPBasis()));
@@ -456,8 +459,8 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
          // numerical errors
          //  on the choice of new column should be very minimal in terms of
          //  performance
-         double approximatePricingValue =
-             double(maxPricingValue) / double(dualWeights.getOne());
+//         double approximatePricingValue =
+//             double(maxPricingValue) / double(dualWeights.getOne());
          assert(m_completeFocusGraph.setIsStable(set));
          assert(m_completeFocusGraph.setIsStableMaximal(set));
          newSets.push_back(set);
@@ -473,7 +476,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
          double safeLowerBound = weightSum;
          safeLowerBound /= dualWeights.scale();
          if(!m_mapToPreprocessed.fixed_sets.empty()){
-            double fixedSetsValue = m_mapToPreprocessed.fixed_sets.size(); //TODO: does downward rounding apply here?
+            double fixedSetsValue = static_cast<double>(m_mapToPreprocessed.fixed_sets.size());
             safeLowerBound += fixedSetsValue;
          }
          fesetround(mode);
@@ -496,7 +499,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       fesetround(FE_DOWNWARD);
       double derivedLowerBound = m_lpSolver.objective() / pricingProblemUB;
       if(!m_mapToPreprocessed.fixed_sets.empty()){
-         double fixedSetsValue = m_mapToPreprocessed.fixed_sets.size(); //TODO: does downward rounding apply here?
+         double fixedSetsValue = static_cast<double>(m_mapToPreprocessed.fixed_sets.size());
          derivedLowerBound += fixedSetsValue;
       }
       fesetround(mode);
@@ -514,8 +517,8 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
    return PricingResult::FOUND_COLUMN; // TODO: pick up on abort and no found columns here
 }
 void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
-                                       SafeWeight weight, void *user_data,
-                                       bool first_solution, bool &stop_solving,
+                                       SafeWeight /*weight*/, void */*user_data*/,
+                                       bool /*first_solution*/, bool &stop_solving,
                                        bool &accepted_solution) {
 
    accepted_solution = false;
@@ -546,13 +549,12 @@ void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,
 void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,std::atomic_bool& stop) {
 
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
-   double cutOffBound = static_cast<double>(t_solData.upperBoundUnscaled())-1.0 - m_mapToPreprocessed.fixed_sets.size();
+   double cutOffBound = static_cast<double>(t_solData.upperBoundUnscaled()) - 1.0 - static_cast<double>(m_mapToPreprocessed.fixed_sets.size());
    if(m_lpSolver.objective() >= cutOffBound + t_solData.settings().roundingTolerance()){
       return;
    }
    const auto& focusGraph = m_focusGraph;
    const auto& preprocessedToFocus = m_mapToPreprocessed.oldToNewIDs;
-   const auto& preprocessedGraph = t_solData.preprocessedGraph();
    const auto& variables = m_localData.variables();
    auto LPsol = m_lpSolver.getPrimalSolution();
    assert(!LPsol.empty());
@@ -584,7 +586,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,st
    auto projectedSolCopy = projectedSolution;
    while(!uncoloredNodes.empty()){
       auto best = std::max_element(projectedSolution.begin(),projectedSolution.end(),[&](const PartialSolVar& a, const PartialSolVar& b){
-         return a.value*a.projectedSet.size() < b.value*b.projectedSet.size();
+         return a.value*static_cast<double>(a.projectedSet.size()) < b.value*static_cast<double>(b.projectedSet.size());
       });
       uncoloredNodes.inplaceDifference(best->projectedSet);
       color_indices.emplace_back(best);
@@ -615,7 +617,7 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,st
       }else{
          // Need to repair the solution.
          // In this case we need to add columns which are also valid in the current node
-         // TODO: somehow try minimizing the # of added columns
+         // TODO: somehow try minimizing the # of added columns; search for columns before maximizing?
          SetColoring setColoring;
          for(const auto& var : color_indices){
             long index = std::distance(projectedSolution.cbegin(),var);
@@ -633,8 +635,10 @@ void ColorNodeWorker::roundingHeuristic(BBNode &node, SolutionData &t_solData,st
          }
          auto indices = repairColoring(colors,t_solData);
 
-         addSolution(indices,node,t_solData,true,stop); //Currently we have already added the 'repaired' columns to the LP; we probably want to only do this if the solution is 'worth saving'
-      };
+         //TODO Currently we have already added the 'repaired' columns to the LP;
+         //we probably want to only do this if the solution is 'worth saving'
+         addSolution(indices,node,t_solData,true,stop);
+      }
    }
 
 }
@@ -715,14 +719,14 @@ void ColorNodeWorker::addColumnsToLP(const std::vector<DenseSet> &sets) {
 }
 void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData, std::atomic_bool& stop) {
    const int frequency = t_solData.settings().divingFrequency();
-   const int depth = t_node.depth();
+   const int depth = static_cast<int>(t_node.depth());
    if( frequency == -1 || (frequency == 0 && depth != 0) ||
        (frequency > 0 && depth % frequency != 0) ){
       return;
    }
    //do not dive if we cannot find an incumbent anyways (TODO make setting for finding equivalent solutions for crossover)
-   double cutoffLimit = t_solData.upperBoundUnscaled()-1.0 + t_solData.settings().roundingTolerance()
-       - m_mapToPreprocessed.fixed_sets.size();
+   double cutoffLimit = static_cast<double>(t_solData.upperBoundUnscaled())-1.0 + t_solData.settings().roundingTolerance()
+       - static_cast<double>(m_mapToPreprocessed.fixed_sets.size());
    if(m_lpSolver.objective() > cutoffLimit){
       return;
    }
@@ -823,8 +827,33 @@ void ColorNodeWorker::divingHeuristic(BBNode &t_node, SolutionData &t_solData, s
          // no need to repair
          addSolution(indices,t_node,t_solData,true,stop);
       }else{
-         //TODO: fix
-         std::cout<<"Could not repair diving solution : "<<m_lpSolver.objective()<<"\n";
+         // Need to repair the solution.
+         // In this case we need to add columns which are also valid in the current node
+
+         const auto& preprocessedToFocus = m_mapToPreprocessed.oldToNewIDs;
+         SetColoring setColoring;
+         for(const auto& var : indices){
+            DenseSet newSet(m_focusGraph.numNodes(),false);
+            preprocessedToFocus.transform(variables[var].set(),newSet);
+            setColoring.addColor(newSet);
+         }
+
+         assert(setColoring.isValid(m_focusGraph));
+         NodeColoring coloring(m_focusGraph.numNodes(),setColoring);
+         NodeColoring newColoring = extendColoring(coloring,m_mapToPreprocessed,m_completeFocusGraph);
+
+         SetColoring fixedColoring(newColoring);
+         assert(fixedColoring.isValid(m_completeFocusGraph));
+
+         std::vector<DenseSet> colors = fixedColoring.colors();
+         for(auto& color : colors){
+            maximizeStableSet(color,m_completeFocusGraph);
+         }
+         auto repaired_indices = repairColoring(colors,t_solData);
+
+         //TODO Currently we have already added the 'repaired' columns to the LP;
+         //we probably want to only do this if the solution is 'worth saving'
+         addSolution(repaired_indices,t_node,t_solData,true,stop);
       }
    }
 
@@ -882,8 +911,7 @@ void ColorNodeWorker::setupLPFromScratch(BBNode &bb_node) {
                           .oldToNewIDs[node]; // TODO: check if there is not a
                                               // 'double mapping' here
          if (index != INVALID_NODE) {
-            columnEntries.push_back(
-                ColElem(index, 1.0));
+            columnEntries.emplace_back(index, 1.0);
          }
       }
 
@@ -940,7 +968,7 @@ void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_
       m_mapToPreprocessed.extend(result.map);
 
       if(m_mapToPreprocessed.newToOldIDs.size() == 0) {
-         node.updateLowerBound(m_mapToPreprocessed.fixed_sets.size());
+         node.updateLowerBound(static_cast<double>(m_mapToPreprocessed.fixed_sets.size()));
          node.setStatus(BBNodeStatus::CUT_OFF);
          if(m_mapToPreprocessed.fixed_sets.size() < solver.upperBoundUnscaled()){
             NodeColoring coloring(0);
@@ -978,7 +1006,7 @@ void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_
       m_focusGraph = result.graph;
       m_mapToPreprocessed = result.map;
       if(m_mapToPreprocessed.newToOldIDs.size() == 0) {
-         node.updateLowerBound(m_mapToPreprocessed.fixed_sets.size());
+         node.updateLowerBound(static_cast<double>(m_mapToPreprocessed.fixed_sets.size()));
          node.setStatus(BBNodeStatus::CUT_OFF);
          if(m_mapToPreprocessed.fixed_sets.size() < solver.upperBoundUnscaled()){
             NodeColoring coloring(0);
@@ -1027,7 +1055,7 @@ void ColorNodeWorker::setupNode(BBNode &node, SolutionData &solver, std::atomic_
    };
 #endif
 }
-void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solData,
+void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &/*t_solData*/,
                                   const PreprocessedMap& t_childMap) {
    if(!t_childMap.removed_nodes.empty()){
       assert(m_focusGraph.numNodes() < m_lpSolver.numRows());
@@ -1053,8 +1081,8 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
       //Save permutation of rows
    }
    auto decisions = bb_node.branchDecisions();
-   std::size_t numDecisions = decisions.size();
-   std::size_t numAdded = bb_node.getNumAddedBranchingDecisions();
+//   std::size_t numDecisions = decisions.size();
+//   std::size_t numAdded = bb_node.getNumAddedBranchingDecisions();
 
    auto bounds = m_lpSolver.columnUpperBounds();
    const auto& variables = m_localData.variables();
@@ -1064,7 +1092,7 @@ void ColorNodeWorker::setupChildLP(BBNode &bb_node, const SolutionData &t_solDat
       if(bounds[j].value == 0.0) continue;
       const auto &set = variables[j].set();
       if(!m_completeFocusGraph.setIsStable(set)){
-         m_lpSolver.changeBounds(j,0.0,0.0);
+         m_lpSolver.changeBounds(static_cast<int>(j),0.0,0.0);
       }
    }
    if(bb_node.depth() != 0){
@@ -1095,7 +1123,6 @@ void ColorNodeWorker::improvementHeuristic(const std::vector<std::size_t>& solVa
    }
 
    std::size_t numSearchColors = initialColoring.numColors()-1;
-   std::size_t lowerBound = 0;
    NodeColoring searchColoring(preprocessedGraph.numNodes(),initialColoring);
    NodeColoring bestColoring = searchColoring;
 
@@ -1189,11 +1216,11 @@ void ColorNodeWorker::runLoop(SolutionData &t_soldata, std::atomic_bool& stop) {
          bool nodeLimitHit = t_soldata.settings().nodeLimit() != NO_NODE_LIMIT &&
                              t_soldata.numProcessedNodes() >= t_soldata.settings().nodeLimit();
          if(stop || m_cancelCurrentNode || nodeLimitHit){
-            bool improved = t_soldata.doRecomputeLowerBound(stop);
+            t_soldata.doRecomputeLowerBound(stop);
             break;
          }
          node = t_soldata.branchAndPopNode(node.value(),*this);
-         bool improved = t_soldata.doRecomputeLowerBound(stop);
+         t_soldata.doRecomputeLowerBound(stop);
          if(t_soldata.numProcessedNodes() % t_soldata.settings().nodeDisplayFrequency() == 0 || t_soldata.numProcessedNodes() < 2){
             t_soldata.display(std::cout);
          }

@@ -137,7 +137,7 @@ void TwinDegreeThreeReduction::newToOldColoring(NodeColoring &coloring) const {
    ++count;
    coloring.setNumColors(count);
 }
-void TwinDegreeThreeFoldReduction::transformStableSet(DenseSet &set) const {
+void TwinDegreeThreeFoldReduction::transformStableSet(DenseSet & /*set*/) const {
    //TODO: fix, not complete
 }
 void TwinDegreeThreeFoldReduction::newToOldColoring(NodeColoring &coloring) const {
@@ -154,7 +154,7 @@ void TwinDegreeThreeFoldReduction::newToOldColoring(NodeColoring &coloring) cons
    assert(keptNodeColor != INVALID_COLOR);
 
    bool inRemoveOneNonNeighbours = true;
-   bool inRemoveTwoNonNeighbours = true;
+//   bool inRemoveTwoNonNeighbours = true;
    bool inKeptNonNeighbours = true;
    for(std::size_t i = 0; i < coloring.numNodes(); ++i){
       if(i == keep) continue;
@@ -163,7 +163,7 @@ void TwinDegreeThreeFoldReduction::newToOldColoring(NodeColoring &coloring) cons
             inRemoveOneNonNeighbours = false;
          }
          if(!remove2NonNeighbours.contains(i)){
-            inRemoveTwoNonNeighbours = false;
+//            inRemoveTwoNonNeighbours = false;
          }
          if(!keepNonNeighbours.contains(i)){
             inKeptNonNeighbours = false;

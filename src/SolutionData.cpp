@@ -6,6 +6,7 @@
 #include "pcog/GreedyColoring.hpp"
 #include "pcog/StableSetMaximizer.hpp"
 #include "pcog/TabuColoring.hpp"
+#include "pcog/GraphIO.hpp"
 
 #include <array>
 #include <iomanip>
@@ -52,7 +53,7 @@ size_t memory_used (bool resident=false)
       unsigned long vm = 0;
       fscanf (file, "%lu", &vm);  // Just need the first num: vm size
       fclose (file);
-      size = static_cast<size_t>(vm) * getpagesize();
+      size = static_cast<size_t>(vm) * static_cast<size_t>(getpagesize());
    }
    return size;
 
@@ -81,7 +82,7 @@ size_t memory_used (bool resident=false)
 std::string bytesToString(std::size_t bytes){
    static constexpr std::array<const char*,5> extension = {"B","kB","MB","GB","TB"};
    std::size_t extension_ind = 0;
-   double show = bytes;
+   double show = static_cast<double>(bytes);
    while(extension_ind < 5){
       if(show <  1000.0){
          break;
@@ -97,7 +98,7 @@ std::string bytesToString(std::size_t bytes){
 std::string itsToString(std::size_t iterations) {
    static constexpr std::array<const char *, 4> extension = {"", "k", "M", "B"};
    std::size_t extension_ind = 0;
-   double show = iterations;
+   double show = static_cast<double>(iterations);
    while(extension_ind < 4 && show > 1'000.0){
       show /= 1000.0;
       ++extension_ind;
@@ -200,10 +201,10 @@ const DenseGraph &SolutionData::originalGraph() const {
 //estimating the b&b tree size of a simple heuristic (using quite a few assumptions)
 double difficultyEstimation(const DenseGraph& graph){
    double invDensity = 1.0- graph.density();
-   double N = graph.numNodes();
+   double N = static_cast<double>(graph.numNodes());
    double avDepth = - std::log(N) / std::log(invDensity);
    double sum = avDepth < 1.0 ? 1.0 : 0.0;
-   for(std::size_t i = 0; i < (avDepth); ++i){
+   for(std::size_t i = 0; static_cast<double>(i) < (avDepth); ++i){
       sum += std::pow(invDensity, static_cast<double>(i * (i + 1)) /2.0);
    }
    sum *= N;
@@ -321,19 +322,20 @@ void SolutionData::doPresolve() {
             nTwoFixingNodes += reduc.secondSet.size();
          }
       }
+      std::size_t nTotal = nLowDegree + nDominated + nSimplicial + nFoldDegreeTwo + nTwinDegreeThree + nTwinDegreeThreeFold + nCrown + nTwoFixing;
+      std::size_t nRemovedTotal = nLowDegree + nDominated + nSimplicialNodes + 2 * nFoldDegreeTwo + nTwinDegreeThreeNodes + 4 * nTwinDegreeThreeFold + nCrownNodes + nTwoFixingNodes;
+      std::size_t nFixedTotal = nSimplicial + nFoldDegreeTwo + 2 * nTwinDegreeThree + 2 * nTwinDegreeThreeFold + nCrownColors + 2 * nTwoFixing;
       std::cout << "Type          | Reductions | removed nodes | fixed colors\n";
       std::cout << "Low degree    | "<<std::setw(10) << nLowDegree <<" | "<< std::setw(13) << nLowDegree << " |            0\n";
       std::cout << "Dominated     | "<<std::setw(10) << nDominated <<" | "<< std::setw(13) << nDominated << " |            0\n";
       std::cout << "Simplicial    | "<<std::setw(10) << nSimplicial <<" | "<< std::setw(13) <<nSimplicialNodes<<" | "<< std::setw(12)<< nSimplicial<<"\n";
       std::cout << "2-folding     | "<<std::setw(10) << nFoldDegreeTwo <<" | "<< std::setw(13) <<2*nFoldDegreeTwo<<" | "<< std::setw(12)<< nFoldDegreeTwo<<"\n";
       std::cout << "Twin degree 3 | "<<std::setw(10) << nTwinDegreeThree <<" | "<< std::setw(13) << nTwinDegreeThreeNodes <<" | "<< std::setw(12)<< 2*nTwinDegreeThree<<"\n";
-      std::cout << "Twin 3-folding| "<<std::setw(10) << nTwinDegreeThreeFold <<" | "<< std::setw(13) <<4*nTwinDegreeThreeFold << " |            0\n";
+      std::cout << "Twin 3-folding| "<<std::setw(10) << nTwinDegreeThreeFold <<" | "<< std::setw(13) <<4*nTwinDegreeThreeFold << " | " << std::setw(12)<< 2*nTwinDegreeThreeFold<<"\n";
       std::cout << "Crown         | "<<std::setw(10) << nCrown <<" | "<< std::setw(13) <<nCrownNodes << " | "<< std::setw(12) << nCrownColors << "\n";
       std::cout << "2-fixing      | "<<std::setw(10) << nTwoFixing <<" | "<<std::setw(13) << nTwoFixingNodes <<" | "<<std::setw(12) << 2*nTwoFixing << "\n";
-
-      using Reduction = std::variant<LowDegreeReduction,DominatedReduction,SimplicialReduction,
-                                     FoldDegreeTwoReduction,TwinDegreeThreeReduction,TwinDegreeThreeFoldReduction,CrownReduction,
-                                     TwoFixingReduction>;
+      std::cout << "---------------------------------------------------------\n";
+      std::cout << "Total         | "<<std::setw(10) << nTotal << " | " << std::setw(13) << nRemovedTotal << " | "<< std::setw(12) << nFixedTotal << "\n";
    }
    std::cout<<"Presolved graph has "<<result.graph.graph.numNodes()<<" nodes, density: "<< result.graph.graph.density()*100.0<<"%\n";
 
@@ -622,7 +624,7 @@ bool SolutionData::assignLB(double t_frac_lb, std::size_t t_lb) {
    if(t_lb == std::numeric_limits<std::size_t>::max()) {
       std::size_t upperBound = m_upperBound; //TODO: is this safe?
       improved = m_lowerBound < upperBound;
-      m_fractionalLowerBound = upperBound ; //TODO: prevent overwriting fractional bound
+      m_fractionalLowerBound = static_cast<double>(upperBound) ; //TODO: prevent overwriting fractional bound
       m_lowerBound = upperBound;
       return improved;
    }
@@ -728,7 +730,6 @@ bool SolutionData::doRecomputeLowerBound(std::atomic_bool& stop) {
    }
    if (improved) {
       display(std::cout);
-
    }
    return improved;
 }

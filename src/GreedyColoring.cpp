@@ -46,7 +46,7 @@ SetColoring GreedyColoring::run_degree_node() const {
 #endif
    return coloring;
 }
-GreedyColoring::GreedyColoring(const DenseGraph &graph) : graph{graph}{
+GreedyColoring::GreedyColoring(const DenseGraph &t_graph) : graph{t_graph}{
 
 }
 

@@ -6,7 +6,7 @@
 #include "pcog/reduction/ReductionStack.hpp"
 
 namespace pcog{
-DominatedReduction::DominatedReduction(Node node, Node dominatingNode) : node{node},dominatedBy{dominatingNode}{
+DominatedReduction::DominatedReduction(Node t_node, Node dominatingNode) : node{t_node},dominatedBy{dominatingNode}{
 
 }
 void DominatedReduction::transformStableSet(DenseSet &set) const {

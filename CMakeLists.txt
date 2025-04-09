@@ -49,9 +49,7 @@ set_target_properties(libpcog PROPERTIES
         CXX_STANDARD 20
         )
 
-find_package(SoPlex REQUIRED)
-message("Libs: " ${SOPLEX_LIBRARIES} " includes: " ${SOPLEX_INCLUDE_DIRS})
-
+find_package(SoPlex 7.1.3 REQUIRED)
 #Setup target
 
 include(GenerateExportHeader)
