@@ -6,6 +6,7 @@
 #include "pcog/Branching.hpp"
 #include "pcog/BranchingSelection.hpp"
 #include "pcog/ColorSolver.hpp"
+#include "pcog/GraphIO.hpp"
 #include "pcog/SolutionData.hpp"
 #include "pcog/TabuColoring.hpp"
 #include "pcog/mwss/AugmentingSearch.hpp"
@@ -168,7 +169,7 @@ void ColorNodeWorker::farkasPricing(BBNode &t_node) {
    // Add new columns and resolve LP
    addColumns(pricedSets);
 }
-void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool duringDiving,
+std::size_t ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool duringDiving,
                                   std::atomic_bool& stop) {
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
    std::size_t numPricingRoundsLimit = std::numeric_limits<std::size_t>::max(); //TODO: limit pricing during diving? Or not, maybe?
@@ -182,12 +183,12 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
       // Solve pricing problem. If new columns can be found, add them and
       // resolve the LP. Otherwise, break away from loop as we have optimally
       // solved this node, and the lower bounds are updated.
-      auto result = priceColumn(node, t_solData,duringDiving,stop);
+      auto result = priceColumn(node, t_solData,duringDiving,stop,numRounds);
       if(result != PricingResult::FOUND_COLUMN){
          break;
       }
       if (m_cancelCurrentNode || t_solData.checkTimeLimitHit(stop)) {
-         return;
+         return numRounds;
       }
       // Resolve lp with newly added columns
       LPSolverStatus status = solveLP(t_solData);
@@ -210,6 +211,7 @@ void ColorNodeWorker::pricingLoop(BBNode &node, SolutionData &t_solData, bool du
    if(!duringDiving){
       node.setBasis(toSmallBasis(m_lpSolver.getLPBasis()));
    }
+   return numRounds;
 }
 void ColorNodeWorker::computeBranchingVertices(BBNode &node,
                                                SolutionData &t_solData,
@@ -352,10 +354,98 @@ void ColorNodeWorker::addColumns(const std::vector<DenseSet> &sets) {
    }
    addColumnsToLP(sets);
 }
+
+SafeDualWeights computeReducedWeights(const SafeDualWeights& original,
+                                      const DenseGraph& focusGraph,
+                                      DualWeightReductionStrategy strategy){
+   if(strategy == DualWeightReductionStrategy::NONE){
+      return original;
+   }
+   SafeDualWeights reduced(original);
+
+   SafeWeight one = reduced.getOne(); //TODO: round slightly?
+   SafeWeight total = reduced.fullCost();
+   SafeWeight reduceBudget = total % one;
+   if(reduceBudget <= 1){
+      return original;
+   }
+   reduceBudget -= 1;
+
+   if(strategy == DualWeightReductionStrategy::NEIGHBOURHOOD){
+      auto& weights = reduced.mutable_weights();
+      assert(focusGraph.numNodes() == weights.size());
+      Node best = INVALID_NODE;
+      int bestCardinality = weights.size() + 1;
+      for(Node node = 0; node < focusGraph.numNodes(); ++node){
+         if(weights[node] <= 0){
+            continue;
+         }
+         int cardinality = 0;
+         for(const auto& neighbour : focusGraph.neighbourhood(node)){
+            if(weights[neighbour] > 0){
+               cardinality += 1;
+            }
+         }
+         if(cardinality < bestCardinality){
+            best = node;
+         }
+      }
+
+      int numNodes = bestCardinality + 1;
+      SafeWeight reduceAmount = reduceBudget / numNodes;
+      int numExtra = reduceBudget % numNodes;
+      int count = 1;
+      ++count;
+      SafeWeight reduceBy = reduceAmount;
+      if(count <= numExtra){
+         reduceBy += 1;
+      }
+      weights[best] = std::max(0,weights[best] - reduceBy);
+
+      for(const auto& neighbour : focusGraph.neighbourhood(best)){
+         if(weights[neighbour] <= 0){
+            continue;
+         }
+         ++count;
+         reduceBy = reduceAmount;
+         if(count <= numExtra){
+            reduceBy += 1;
+         }
+         weights[neighbour] = std::max(0,weights[neighbour] - reduceBy);
+      }
+   }else{
+      assert(strategy == DualWeightReductionStrategy::UNIFORM);
+      int numNodes = 0;
+      auto& weights = reduced.mutable_weights();
+      for (const auto& weight : weights){
+         if(weight != 0){
+            ++numNodes;
+         }
+      }
+
+      SafeWeight reduceAmount = reduceBudget / numNodes;
+      int numExtra = reduceBudget % numNodes;
+      int count = 0;
+      for(auto& weight : weights){
+         if(weight != 0){
+            ++count;
+            SafeWeight reduceBy = reduceAmount;
+            if(count <= numExtra){
+               reduceBy += 1;
+            }
+            weight = std::max(0,weight - reduceBy);
+         }
+      }
+   }
+
+   return reduced;
+}
 PricingResult ColorNodeWorker::priceColumn(BBNode &node,
                                            SolutionData &t_solData,
                                            bool duringDiving,
-                                           std::atomic_bool& stop) {
+                                           std::atomic_bool& stop,
+                                           std::size_t numPricingRounds) {
+   auto start = std::chrono::high_resolution_clock::now();
    m_localData.addPricingIteration();
    // Get dual weights and make them numerically safe
    assert(m_lpSolver.status() == LPSolverStatus::OPTIMAL);
@@ -371,73 +461,184 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       dual = std::max(dual, 0.0);
    }
    SafeDualWeights dualWeights(dualSolution);
-
    // Find column(s) with negative reduced cost in focusGraph
    bool solvedOptimally = false;
    assert(m_pricedVariables.empty());
-
-   //First attempt to do so heuristically
-   bool doHeuristics = true;
-   if(doHeuristics){
-      AugmentingSearch search(dualWeights.weights(),m_focusGraph);
-      std::vector<DenseSet> solutions =
-          search.repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByWeight>(dualWeights.getOne());
-      //TODO: seems to be slower to do the following, test.
-//      if(solutions.empty()){
-//         auto sols = search.
-//                     repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::BySurplus>(dualWeights.getOne(),!solutions.empty());
-//         solutions.insert(solutions.end(),sols.begin(),sols.end());
-//      }
-      for(const auto& sol : solutions){
-         DenseSet preprocessedSol(m_completeFocusGraph.numNodes());
-         m_mapToPreprocessed.newToOldIDs.transform(sol,preprocessedSol);
-         maximizeStableSet(preprocessedSol,m_completeFocusGraph);
-         bool duplicate = false;
-         for(const auto& other_sol : m_pricedVariables){
-            if(other_sol == preprocessedSol){
-               duplicate = true;
-               break;
+   auto pricingStrategy = t_solData.settings().getPricingStrategy();
+   bool doHeuristics = pricingStrategy != PricingAlgorithmStrategy::EXACT;
+   auto dualWeightReductionStrategy = t_solData.settings().dualWeightReductionStrategy();
+   bool runReduced = dualWeightReductionStrategy != DualWeightReductionStrategy::NONE;
+   bool solveCompletely = t_solData.settings().solveNodesCompletely();
+   if(runReduced){
+      SafeDualWeights reducedWeights = computeReducedWeights(dualWeights,m_focusGraph,dualWeightReductionStrategy);
+      //First attempt to do so heuristically
+      if(doHeuristics){
+         AugmentingSearch search(reducedWeights.weights(),m_focusGraph);
+         std::vector<DenseSet> solutions =
+             search.repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByWeight>(reducedWeights.getOne());
+         //TODO: seems to be slower to do the following, test
+         //Depends on the instance if doing more heuristics is a good idea
+         //For difficult pricing problems (i.e. sparse graphs), it is worth it, but for easier instances it is better to run the exact algorithm directly
+         if(pricingStrategy == PricingAlgorithmStrategy::HEURISTIC_HIGH){
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::BySurplus>(reducedWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
+            }
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByMaxRatio>(reducedWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
+            }
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByRatio>(reducedWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
+            }
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByDynamicSurplus>(reducedWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
             }
          }
-         if(!duplicate){
-            m_pricedVariables.push_back(preprocessedSol);
+         for(const auto& sol : solutions){
+            DenseSet preprocessedSol(m_completeFocusGraph.numNodes());
+            m_mapToPreprocessed.newToOldIDs.transform(sol,preprocessedSol);
+            maximizeStableSet(preprocessedSol,m_completeFocusGraph);
+            bool duplicate = false;
+            for(const auto& other_sol : m_pricedVariables){
+               if(other_sol == preprocessedSol){
+                  duplicate = true;
+                  break;
+               }
+            }
+            if(!duplicate){
+               m_pricedVariables.push_back(preprocessedSol);
+            }
          }
       }
+
+      //Exactly; only if we don´t solve the problem exactly.
+      //During diving, we prefer to use heuristics
+      if(m_pricedVariables.empty() && !solveCompletely && (!duringDiving || !doHeuristics)){
+         // run an exact combinatorial algorithm
+         // TODO: refactor a bit.
+         auto lambda = [](const DenseSet &current_nodes, SafeWeight weight,
+                          void *user_data, bool first_solution, bool &stop_solving,
+                          bool &accepted_solution) {
+            auto *worker = reinterpret_cast<ColorNodeWorker *>(user_data);
+            worker->solutionCallback(current_nodes, weight, user_data,
+                                     first_solution, stop_solving,
+                                     accepted_solution);
+         };
+
+         m_mwssSolver.reset();
+         m_mwssSolver =
+             std::make_unique<MaxWeightStableSetCombinatorial<SafeDualWeights>>(
+                 reducedWeights, m_focusGraph);
+         m_mwssSolver->setLowerBound(reducedWeights.getOne());
+         m_mwssSolver->setInfiniteUpperBound();
+         m_mwssSolver->setTimeLimitCheckInterval(10'000);
+         auto timeLeft = t_solData.timeLeft();
+         if(timeLeft.has_value()){
+            m_mwssSolver->setTimeLimit(timeLeft.value());
+         }
+         m_mwssSolver->setInterrupt(&m_cancelCurrentNode);
+         if(duringDiving){
+            m_mwssSolver->setNodeLimit(10*m_focusGraph.numNodes()); //TODO: fix
+         }
+         m_mwssSolver->setUserData(this);
+         m_mwssSolver->setCallback(lambda);
+
+         m_mwssSolver->run();
+         solvedOptimally = !m_mwssSolver->stoppedBeforeOptimality();
+      }
+
    }
-
-   //then exactly
-   if(m_pricedVariables.empty() && (!duringDiving || !doHeuristics)){
-      // run an exact combinatorial algorithm
-      // TODO: refactor a bit.
-      auto lambda = [](const DenseSet &current_nodes, SafeWeight weight,
-                       void *user_data, bool first_solution, bool &stop_solving,
-                       bool &accepted_solution) {
-         auto *worker = reinterpret_cast<ColorNodeWorker *>(user_data);
-         worker->solutionCallback(current_nodes, weight, user_data,
-                                  first_solution, stop_solving,
-                                  accepted_solution);
-      };
-
-      m_mwssSolver.reset();
-      m_mwssSolver =
-          std::make_unique<MaxWeightStableSetCombinatorial<SafeDualWeights>>(
-              dualWeights, m_focusGraph);
-      m_mwssSolver->setLowerBound(dualWeights.getOne());
-      m_mwssSolver->setInfiniteUpperBound();
-      m_mwssSolver->setTimeLimitCheckInterval(10'000);
-      auto timeLeft = t_solData.timeLeft();
-      if(timeLeft.has_value()){
-         m_mwssSolver->setTimeLimit(timeLeft.value());
+   if(!runReduced || (m_pricedVariables.empty() && solveCompletely)){
+      //First attempt to do so heuristically
+      if(doHeuristics){
+         AugmentingSearch search(dualWeights.weights(),m_focusGraph);
+         std::vector<DenseSet> solutions =
+             search.repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByWeight>(dualWeights.getOne());
+         //TODO: seems to be slower to do the following, test
+         //Depends on the instance if doing more heuristics is a good idea
+         //For difficult pricing problems (i.e. sparse graphs), it is worth it, but for easier instances it is better to run the exact algorithm directly
+         if(pricingStrategy == PricingAlgorithmStrategy::HEURISTIC_HIGH){
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::BySurplus>(dualWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
+            }
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByMaxRatio>(dualWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
+            }
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByRatio>(dualWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
+            }
+            if(solutions.empty()){
+               auto sols = search.
+                           repeatedGreedyLocalSearch<AugmentingSearch::GreedyStrategy::ByDynamicSurplus>(dualWeights.getOne(),!solutions.empty());
+               solutions.insert(solutions.end(),sols.begin(),sols.end());
+            }
+         }
+         for(const auto& sol : solutions){
+            DenseSet preprocessedSol(m_completeFocusGraph.numNodes());
+            m_mapToPreprocessed.newToOldIDs.transform(sol,preprocessedSol);
+            maximizeStableSet(preprocessedSol,m_completeFocusGraph);
+            bool duplicate = false;
+            for(const auto& other_sol : m_pricedVariables){
+               if(other_sol == preprocessedSol){
+                  duplicate = true;
+                  break;
+               }
+            }
+            if(!duplicate){
+               m_pricedVariables.push_back(preprocessedSol);
+            }
+         }
       }
-      m_mwssSolver->setInterrupt(&m_cancelCurrentNode);
-      if(duringDiving){
-         m_mwssSolver->setNodeLimit(10*m_focusGraph.numNodes()); //TODO: fix
-      }
-      m_mwssSolver->setUserData(this);
-      m_mwssSolver->setCallback(lambda);
 
-      m_mwssSolver->run();
-      solvedOptimally = !m_mwssSolver->stoppedBeforeOptimality();
+      //Exactly; only if we don´t solve the problem exactly.
+      //During diving, we prefer to use heuristics
+      if(m_pricedVariables.empty() && (!duringDiving || !doHeuristics)){
+         // run an exact combinatorial algorithm
+         // TODO: refactor a bit.
+         auto lambda = [](const DenseSet &current_nodes, SafeWeight weight,
+                          void *user_data, bool first_solution, bool &stop_solving,
+                          bool &accepted_solution) {
+            auto *worker = reinterpret_cast<ColorNodeWorker *>(user_data);
+            worker->solutionCallback(current_nodes, weight, user_data,
+                                     first_solution, stop_solving,
+                                     accepted_solution);
+         };
+
+         m_mwssSolver.reset();
+         m_mwssSolver =
+             std::make_unique<MaxWeightStableSetCombinatorial<SafeDualWeights>>(
+                 dualWeights, m_focusGraph);
+         m_mwssSolver->setLowerBound(dualWeights.getOne());
+         m_mwssSolver->setInfiniteUpperBound();
+         m_mwssSolver->setTimeLimitCheckInterval(10'000);
+         auto timeLeft = t_solData.timeLeft();
+         if(timeLeft.has_value()){
+            m_mwssSolver->setTimeLimit(timeLeft.value());
+         }
+         m_mwssSolver->setInterrupt(&m_cancelCurrentNode);
+         if(duringDiving){
+            m_mwssSolver->setNodeLimit(10*m_focusGraph.numNodes()); //TODO: fix
+         }
+         m_mwssSolver->setUserData(this);
+         m_mwssSolver->setCallback(lambda);
+
+         m_mwssSolver->run();
+         solvedOptimally = !m_mwssSolver->stoppedBeforeOptimality();
+      }
+
    }
    // Add column(s) to the LP and resolve
 
@@ -467,6 +668,10 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       }
    }
    m_pricedVariables.clear();
+   auto end = std::chrono::high_resolution_clock::now();
+   double duration = (end-start).count() / 1e9;
+
+   //TODO: correctly handle LB updates with weight reductions
    if (newSets.empty()) {
       bool improvedLB = false;
       if (!duringDiving && solvedOptimally) {
@@ -514,6 +719,7 @@ PricingResult ColorNodeWorker::priceColumn(BBNode &node,
       synchronizeStastistics(node,t_solData,stop);
    }
    addColumns(newSets);
+
    return PricingResult::FOUND_COLUMN; // TODO: pick up on abort and no found columns here
 }
 void ColorNodeWorker::solutionCallback(const DenseSet &current_nodes,

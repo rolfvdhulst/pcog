@@ -261,6 +261,7 @@ void SolutionData::startSolveTime() {
 }
 void SolutionData::doPresolve() {
    // TODO: find an initial coloring using a simple greedy method.
+   assert(m_originalGraph.numSelfLoops() == 0);
    GreedyColoring greedy(m_originalGraph); //TODO: extract clique from saturation degree
    auto coloring = greedy.run_saturation_degree();
    std::cout<<"DSATUR found " << coloring.numColors()<<"-coloring\n";
@@ -435,11 +436,13 @@ std::size_t SolutionData::numOpenNodes() {
 std::size_t SolutionData::numProcessedNodes() {
    std::scoped_lock guard(m_lowerBound_mutex);
    std::size_t numNodes = m_tree.numProcessedNodes();
-   for(const auto& lb : m_processing_node_lower_bounds) {
-      if(lb.has_value()) {
-         --numNodes;
-      }
-   }
+
+   //TODO: the below is hacky but is there for some reason. Goes wrong in some cases.. Fix?
+//   for(const auto& lb : m_processing_node_lower_bounds) {
+//      if(lb.has_value()) {
+//         --numNodes;
+//      }
+//   }
    return numNodes;
 }
 const std::vector<StableSetVariable> &SolutionData::variables() const {
@@ -813,5 +816,11 @@ void SolutionData::stopComputation(std::atomic_bool &stop) {
          worker.cancelNode(true);
       }
    }
+}
+void SolutionData::setProblemName(std::string name) {
+   problemName = name;
+}
+std::string SolutionData::getProblemName() const {
+   return problemName;
 }
 }// namespace pcog

@@ -77,10 +77,12 @@ void DenseReductionGraph::setLowerBoundClique(const DenseSet &clique,
    lowerbound = numCliqueNodes;
 }
 void DenseReductionGraph::removeNode(Node node) {
+   assert(isConsistent());
    removeGraphNode(node);
    if(hasLowerBound() && lowerBoundNodes().contains(node)){
       --lowerbound;
    }
+   assert(isConsistent());
 }
 void DenseReductionGraph::removeStableSet(const DenseSet &set) {
    for(const auto& node : set){
@@ -151,6 +153,17 @@ InducedGraph DenseReductionGraph::currentGraph() const {
    }
 #endif
    return induced;
+}
+bool DenseReductionGraph::isConsistent() const {
+   for(Node node : presentNodes){
+      if(neighbourhood(node).size() != degrees[node]){
+         return false;
+      }
+      if(neighbourhood(node).contains(node)){
+         return false;
+      }
+   }
+   return true;
 }
 
 }

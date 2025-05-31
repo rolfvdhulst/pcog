@@ -78,6 +78,8 @@ class DenseGraph {
    /// Counts the number of nodes which has a selfloop (e.g. an (a,a) edge for
    /// node a) \return The number of self loops
    [[nodiscard]] degree_type numSelfLoops() const;
+   /// Removes the self loops of the graph
+   void removeSelfLoops();
 
    /// Checks if node a dominates node b
    /// \param a The first node

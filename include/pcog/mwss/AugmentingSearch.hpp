@@ -30,12 +30,16 @@ class AugmentingSearch {
    void addNodeToSolution(Node node);
    void removeNodeFromSolution(Node node);
    [[nodiscard]] std::vector<Node> decreasingWeightOrdering() const;
+   [[nodiscard]] std::vector<Node> decreasingRatioOrdering() const;
+   [[nodiscard]] std::vector<Node> decreasingMaxRatioOrdering() const;
 
-   enum class GreedyStrategy { ByWeight, ByDynamicSurplus, BySurplus };
+   enum class GreedyStrategy { ByWeight, ByDynamicSurplus, BySurplus, ByRatio, ByMaxRatio};
 
    std::size_t greedyByWeight(long rotateOrderBy);
    std::size_t greedyByDynamicSurplus(long rotateOrderBy);
    std::size_t greedyByStaticSurplus(long rotateOrderBy);
+   std::size_t greedyByRatio(long rotateOrderBy);
+   std::size_t greedyByMaxRatio(long rotateOrderBy);
    template <AugmentingSearch::GreedyStrategy strategy>
    std::size_t greedyAlgorithm(long rotateOrderBy = 0) {
       if constexpr (strategy == AugmentingSearch::GreedyStrategy::ByWeight) {
@@ -44,6 +48,12 @@ class AugmentingSearch {
       if constexpr (strategy ==
                     AugmentingSearch::GreedyStrategy::ByDynamicSurplus) {
          return greedyByDynamicSurplus(rotateOrderBy);
+      }
+      if constexpr (strategy == AugmentingSearch::GreedyStrategy::ByRatio) {
+         return greedyByRatio(rotateOrderBy);
+      }
+      if constexpr (strategy == AugmentingSearch::GreedyStrategy::ByMaxRatio) {
+         return greedyByMaxRatio(rotateOrderBy);
       }
       return greedyByStaticSurplus(rotateOrderBy);
    }

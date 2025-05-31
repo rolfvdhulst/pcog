@@ -8,8 +8,10 @@ Settings::Settings()
     : m_node_limit{NO_NODE_LIMIT},
       m_time_limit{NO_TIME_LIMIT},
       m_branchingStrategy{BranchingStrategy::INTERSECTION_UNION_SIZE},
-      m_branchCandidateSelectionStrategy{
-          CandidateSelectionStrategy::VIOLATED_IN_BOTH},
+      m_branchCandidateSelectionStrategy{CandidateSelectionStrategy::VIOLATED_IN_BOTH},
+      m_pricingAlgorithmStrategy{PricingAlgorithmStrategy::HEURISTIC_HIGH},
+      m_dualWeightReductionStrategy{DualWeightReductionStrategy::NONE},
+      m_solveNodesCompletely{true},
       m_nodeSelectionStrategy{NodeSelectionStrategy::DFS_BOUND},
       m_nodeChildSelectionStrategy{NodeChildSelectionStrategy::PREFER_DIFFER},
       m_dfsRestartFrequency{10}, m_rounding_tolerance{1e-8},

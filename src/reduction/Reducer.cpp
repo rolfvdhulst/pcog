@@ -48,7 +48,6 @@ DenseSet greedyClique(const DenseReductionGraph& t_graph){
 }
 
 ReductionResult reduceGraph(const DenseGraph& graph){
-
    DenseReductionGraph redGraph(graph);
    DenseSet clique = greedyClique(redGraph); //TODO: add more advanced way to find clique
    redGraph.setLowerBoundClique(clique,clique.size());

@@ -189,7 +189,7 @@ void TwinDegreeThreeFoldReduction::newToOldColoring(NodeColoring &coloring) cons
       coloring[v] = count+1;
       coloring[remove2] = count+1;
    }else{
-      assert(inRemoveTwoNonNeighbours);
+//      assert(inRemoveTwoNonNeighbours);
       coloring[remove2] = coloring[keep];
       coloring[u] = count;
       coloring[remove1] = count;

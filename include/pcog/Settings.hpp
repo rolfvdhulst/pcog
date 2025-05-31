@@ -48,12 +48,29 @@ enum class NodeSelectionStrategy : int{
                /// choosing the node with smallest bound.
 };
 
-///When picking a child node
+///When picking a child node, decide whether to pick the left/right node for the current relaxation.
+///Typically, one wants to pick the weakest node, which is often DIFFER, as this leads to less time wasted reloading the LP.
 enum class NodeChildSelectionStrategy : int{
    PREFER_SAME = 0,
    PREFER_DIFFER = 1,
    RANDOMLY = 2
 };
+
+enum class PricingAlgorithmStrategy : int{
+   EXACT = 0, ///Only use the exact combinatorial algorithm. This is only recommended for graphs where the pricing problem is very easy.
+   HEURISTIC_LOW = 1, ///Call the greedy search heuristic.
+   HEURISTIC_HIGH = 2, //Call the extensive greedy search heuristic with many different orderings. Recommended for graphs where the pricing problem becomes very hard.
+};
+
+///Control whether the dual weights for the pricing problem are altered.
+///This may make the pricing problem easier and can avoid the ´tailing off' effect and reduce the number of pricing iterations.
+///The downside is that not completly solving the pricing loop typically leads to worse branching decisions
+enum class DualWeightReductionStrategy : int {
+   NONE = 0,          ///Do not alter the dual weights for the pricing problem
+   NEIGHBOURHOOD = 1, ///Alter the dual weights for the pricing problem by reducing the weights around the largest-value node.
+   UNIFORM = 2        ///Alter the dual weights for the pricing problem
+};
+
 class Settings {
  public:
    Settings();
@@ -123,15 +140,24 @@ class Settings {
 
    void setNumInitialTabuIterations(std::size_t numIters) { m_numInitialTabuIterations = numIters;}
    [[nodiscard]] std::size_t numInitialTabuIterations() const {return m_numInitialTabuIterations;}
+
+   [[nodiscard]] PricingAlgorithmStrategy getPricingStrategy() const { return m_pricingAlgorithmStrategy;}
+   void setPricingAlgorithmStrategy(PricingAlgorithmStrategy t_strategy) { m_pricingAlgorithmStrategy = t_strategy;}
+
+   void setDualWeightReductionStrategy(DualWeightReductionStrategy t_strategy) { m_dualWeightReductionStrategy = t_strategy; }
+   [[nodiscard]] DualWeightReductionStrategy dualWeightReductionStrategy() const {return m_dualWeightReductionStrategy;}
+
+   void setSolveNodesCompletely(bool t_solveCompletely) { m_solveNodesCompletely = t_solveCompletely; }
+   [[nodiscard]] bool solveNodesCompletely() const { return m_solveNodesCompletely;}
  private:
    std::size_t m_node_limit; /// maximal number of nodes to process
    double m_time_limit; /// maximal time in seconds to run
-   std::size_t m_absgap_limit; /// solving stops as soon as upperBound-lowerBound <= absolute_gap_limit is proven
-   double m_relgap_limit; /// solving stops as soon as (upperBound-lowerBound)/lowerBound <= relative_gap_limit is proven
 
    BranchingStrategy m_branchingStrategy;
    CandidateSelectionStrategy m_branchCandidateSelectionStrategy;
-
+   PricingAlgorithmStrategy m_pricingAlgorithmStrategy;
+   DualWeightReductionStrategy m_dualWeightReductionStrategy;
+   bool m_solveNodesCompletely;
 
    NodeSelectionStrategy m_nodeSelectionStrategy;
    NodeChildSelectionStrategy m_nodeChildSelectionStrategy;

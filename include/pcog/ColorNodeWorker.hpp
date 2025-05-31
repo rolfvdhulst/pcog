@@ -32,7 +32,7 @@ class ColorNodeWorker {
          m_worker_id{t_id},
          m_focusNode{INVALID_BB_NODE},
          m_random_engine{t_id+42},
-         m_maximizer{t_id}{};
+         m_maximizer{t_id}{}
 
    ColorNodeWorker(const ColorNodeWorker& t_worker) :
    m_cancelCurrentNode{bool(t_worker.m_cancelCurrentNode)},
@@ -67,7 +67,7 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
                      const PreprocessedMap &t_childMap);
    void setupLPFromScratch(BBNode &node);
    void farkasPricing(BBNode &node);
-   void pricingLoop(BBNode &node, SolutionData &t_solver, bool duringDiving,
+   std::size_t pricingLoop(BBNode &node, SolutionData &t_solver, bool duringDiving,
                     std::atomic_bool& stop);
    void roundingHeuristic(BBNode &node, SolutionData &t_solver, std::atomic_bool& stop);
    void divingHeuristic(BBNode &t_node, SolutionData &t_solver, std::atomic_bool& stop);
@@ -80,7 +80,8 @@ m_random_engine{t_worker.m_random_engine},m_mwssSolver(),m_pricedVariables{t_wor
                     std::atomic_bool& stop);
 
    PricingResult priceColumn(BBNode &node, SolutionData &t_solver,
-                             bool duringDiving,std::atomic_bool& stop);
+                             bool duringDiving,std::atomic_bool& stop,
+                             std::size_t numPricingRounds);
    void solutionCallback(const DenseSet &current_nodes, SafeWeight weight,
                          void *user_data, bool first_solution,
                          bool &stop_solving, bool &accepted_solution);

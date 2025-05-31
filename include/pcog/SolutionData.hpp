@@ -76,6 +76,9 @@ class SolutionData {
    void syncLocalLowerBound(LowerBoundInfo lbInfo, std::size_t worker_id,  std::atomic_bool& stop);
 
    bool doRecomputeLowerBound(std::atomic_bool& stop);
+
+   void setProblemName(std::string problem);
+   [[nodiscard]] std::string getProblemName() const;
  private:
    std::vector<node_id> createChildren(const BBNode& t_node, ColorNodeWorker& t_nodeWorker);
    void pruneUpperBound(std::size_t upperBound,std::atomic_bool& stop);
@@ -89,6 +92,7 @@ class SolutionData {
    bool recomputeLowerBound();
    bool assignLB(double t_frac_lb, std::size_t t_lb);
 
+   std::string problemName;
    // Original Problem data
    DenseGraph m_originalGraph;
    // Problem after presolving.

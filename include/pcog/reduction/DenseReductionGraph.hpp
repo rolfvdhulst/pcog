@@ -33,6 +33,8 @@ class DenseReductionGraph {
    [[nodiscard]] std::size_t lowerBound() const;
    [[nodiscard]] const DenseSet& lowerBoundNodes() const;
    void setLowerBoundClique(const DenseSet& clique, std::size_t numCliqueNodes);
+
+   bool isConsistent() const;
  private:
    void removeGraphNode(Node node);
    std::vector<DenseSet> adjacencyMatrix;

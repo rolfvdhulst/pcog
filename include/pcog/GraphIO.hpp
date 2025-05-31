@@ -49,6 +49,16 @@ std::optional<DimacsFileHeader> readDimacsHeader(std::ifstream &fileStream);
 bool writeToDimacsFile(const DenseGraph &graph, std::ofstream &file,
                        const std::string &name, const std::string &header);
 
+/// Writes a graph to a dimacs file
+/// \param graph The graph to write
+/// \param weights The node weights
+/// \param file the stream to write to
+/// \param name The name of the graph
+/// \param header The comment header for the dimacs file
+/// \return true if writing was done succesfully, false otherwise
+bool writeToWeightedDimacsFile(const DenseGraph &graph, std::vector<int> weights,
+                                std::ofstream &file, const std::string &name, const std::string &header);
+
 /// Writes the graph out the dot graph format
 /// \param graph The graph to write out
 /// \param stream The stream to write the dot file to

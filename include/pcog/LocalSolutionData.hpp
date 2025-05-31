@@ -45,6 +45,8 @@ class LocalSolutionData{
    void addSolution(const std::vector<std::size_t>& t_stable_set_indices);
    [[nodiscard]] std::size_t mapToGlobalIndex(std::size_t localVarIndex) const;
    GlobalToLocalMapping getGlobalToLocalMapping() const;
+
+   std::size_t getPricingIterations() const;
  private:
 
    std::vector<StableSetVariable> m_variables;

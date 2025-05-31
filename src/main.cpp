@@ -2,10 +2,11 @@
 // Created by rolf on 25-2-23.
 //
 
-#include <pcog/GraphIO.hpp>
-#include <pcog/ColorSolver.hpp>
-#include <pcog/config.h>
 #include "git_version.h"
+#include <filesystem>
+#include <pcog/ColorSolver.hpp>
+#include <pcog/GraphIO.hpp>
+#include <pcog/config.h>
 
 using namespace pcog;
 
@@ -36,9 +37,11 @@ void printUsage(){
                 " 1 = Use DFS until integral lower bound is improved, then pick node with worst lower bound, 2 = similar to 1 but restart after a fixed number of nodes\n";
    std::cout<<"\t --backtrack-freq\t\t\t: ([>0], default: "<<settings.dfsRestartFrequency()<<") Backtracking frequency used when node-selection == 2 (DFS_RESTART)\n";
    std::cout<<"\t -c, --node-child-selection\t: ([0-2], default: "<<static_cast<int>(settings.nodeChildSelectionStrategy()) << ") How to choose child nodes in node selection. 0 = Choose SAME branch, 1 = choose DIFFER branch, 2 = choose randomly\n";
+   std::cout<<"\t -p, --pricing \t: ([0-2], default: "<<static_cast<int>(settings.getPricingStrategy()) <<") What pricing algorithms to use. 0 = Only the exact combinatorial pricing algorithm. 1 = A few heuristics + Exact combinatorial algorithm, 2 = Many heuristics + Exact combinatorial algorithm, \n";
+
    std::cout<<"\t -r, --rounding-tolerance\t: ([0-0.5], default: "<<settings.roundingTolerance()<<") Internal tolerance used to round for heuristics. Does not affect the exact lower bound computation\n";
    std::cout<<"\t -d, --diving-freq\t\t\t: (>=-1, default: "<<settings.divingFrequency() <<") Perform diving at nodes with depth % frequency == 0. Set to -1 to disable, set to zero to only run at the root node\n";
-   std::cout<<"\t -p, --diving-pricing-freq\t: (>=-1, default: "<<settings.divingPricingFrequency() <<") Perform pricing during diving at nodes with depth % frequency == 0. Set to -1 to disable, set to zero to only run at the root node\n";
+   std::cout<<"\t -f, --diving-pricing-freq\t: (>=-1, default: "<<settings.divingPricingFrequency() <<") Perform pricing during diving at nodes with depth % frequency == 0. Set to -1 to disable, set to zero to only run at the root node\n";
    std::cout<<"\t -i, --init-tabu-iters\t\t: (>=0, default: "<<settings.numInitialTabuIterations() <<") Number of iterations to use during initial tabu search\n";
 
 }
@@ -93,6 +96,12 @@ int main(int argc, char ** argv) {
                if (value < 0 || value > 2)
                   throw std::invalid_argument(arguments[i]);
                settings.setNodeChildSelectionStrategy(NodeChildSelectionStrategy(value));
+            }else if (input == "-p" || input == "--pricing") {
+               ++i;
+               int value = std::stoi(arguments[i]);
+               if (value < 0 || value > 2)
+                  throw std::invalid_argument(arguments[i]);
+               settings.setPricingAlgorithmStrategy(PricingAlgorithmStrategy(value));
             }else if (input == "-l" || input == "--time-limit") {
                ++i;
                double value = std::stod(arguments[i]);
@@ -115,7 +124,7 @@ int main(int argc, char ** argv) {
                if (value < -1)
                   throw std::invalid_argument(arguments[i]);
                settings.setDivingFrequency(value);
-            }else if (input == "-p" || input == "--diving-pricing-freq") {
+            }else if (input == "-f" || input == "--diving-pricing-freq") {
                ++i;
                int value = std::stoi(arguments[i]);
                if (value < -1)
@@ -149,7 +158,14 @@ int main(int argc, char ** argv) {
       std::cout<<"Could not read graph from file!\n";
       return EXIT_FAILURE;
    }
-   solver.setProblem("test",graph.value());
+   std::size_t loops = graph->numSelfLoops();
+   if(loops != 0){
+      std::cout<<"WARNING: Given graph contains "<<loops<<" loop edges. These are being ignored by the solver.\n";
+      graph->removeSelfLoops();
+   }
+   assert(graph->numSelfLoops() == 0);
+   std::string strippedName = std::filesystem::path(arguments[1]).stem();
+   solver.setProblem(strippedName,graph.value());
    solver.solve();
    return EXIT_SUCCESS;
 }

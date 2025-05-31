@@ -8,6 +8,7 @@
 namespace pcog {
 
 void ColorSolver::setProblem(std::string t_name, DenseGraph t_graph) {
+   m_solData.setProblemName(t_name);
    m_problemName = std::move(t_name);
    m_solData.reset(std::move(t_graph));
    m_status = SolverStatus::PROBLEM_INITIALIZED;

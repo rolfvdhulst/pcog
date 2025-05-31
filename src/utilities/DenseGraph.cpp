@@ -175,18 +175,23 @@ double DenseGraph::density() const {
                     static_cast<double>(nodes*(nodes-1));
    return density;
 }
-DenseSet& DenseGraph::mutableNeighbourhood(Node t_node){
-return m_adjacencyMatrix[t_node];
+DenseSet &DenseGraph::mutableNeighbourhood(Node t_node) {
+   return m_adjacencyMatrix[t_node];
 }
 bool DenseGraph::setIsClique(const DenseSet &set) const {
-DenseSet temp(set);
-for(Node node : set){
+   DenseSet temp(set);
+   for (Node node : set) {
       temp.remove(node);
-      if(!temp.isSubsetOf(neighbourhood(node))){
+      if (!temp.isSubsetOf(neighbourhood(node))) {
          return false;
       }
       temp.add(node);
+   }
+   return true;
 }
-return true;
+void DenseGraph::removeSelfLoops() {
+   for(Node node = 0; node < m_adjacencyMatrix.size(); ++node){
+      m_adjacencyMatrix[node].remove(node);
+   }
 }
 } // namespace pcog

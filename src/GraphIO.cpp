@@ -81,6 +81,47 @@ bool writeToDimacsFile(const DenseGraph &graph, std::ofstream &ofstream,
    }
    return true;
 }
+
+bool writeToWeightedDimacsFile(const DenseGraph &graph, std::vector<int> weights,
+                               std::ofstream &ofstream, const std::string &name, const std::string &header) {
+   if (!ofstream.good()) {
+      return false;
+   }
+   // split header into multiple lines
+   auto result = std::vector<std::string>{};
+   auto ss = std::stringstream{header};
+   for (std::string line; std::getline(ss, line, '\n');) {
+      result.push_back(line);
+   }
+   const std::string comment_preamble = "c ";
+   std::string firstLine = comment_preamble + "FILE: " + name + "\n";
+   ofstream << firstLine;
+   ofstream << comment_preamble << "\n";
+   ofstream << comment_preamble << "DESCRIPTION: \n";
+   for (const auto &line : result) {
+      ofstream << comment_preamble << line << "\n";
+   }
+   std::size_t num_nodes = graph.numNodes();
+   std::size_t num_edges = graph.numEdges();
+   ofstream << "p edge " << num_nodes << " " << num_edges << "\n";
+   std::string buffer;
+   for(Node i = 0; i < num_nodes; ++i) {
+      ofstream<<"n "<<i+1<<" "<<weights[i]<<"\n";
+   }
+   for (Node i = 0; i < num_nodes; ++i) {
+      const auto &neighbourhood = graph.neighbourhood(i);
+      Node neighbour = neighbourhood.find_next(i);
+      while (neighbour != INVALID_NODE) {
+         buffer += ("e " + std::to_string(i + 1) + " " +
+                    std::to_string(neighbour + 1) +
+                    "\n"); // all indices in the format start with 1...
+         neighbour = neighbourhood.find_next(neighbour);
+      }
+      ofstream << buffer;
+      buffer.clear();
+   }
+   return true;
+}
 std::optional<DenseGraph> DimacsFileHeader::ReadAsDense() {
    DenseGraph graph(vertices);
    file.seekg(start_edges_pos);
